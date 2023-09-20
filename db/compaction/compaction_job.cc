@@ -1829,6 +1829,7 @@ Status CompactionJob::OpenCompactionOutputFile(SubcompactionState* sub_compact,
         sub_compact->compaction->mutable_cf_options()->last_level_temperature;
   }
   fo_copy.temperature = temperature;
+  fo_copy.io_options.operation_name = OperationName::kCompactionWrite;
 
   Status s;
   IOStatus io_s = NewWritableFile(fs_.get(), fname, &writable_file, fo_copy);

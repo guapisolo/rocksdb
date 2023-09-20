@@ -1539,8 +1539,14 @@ Status Version::GetTableProperties(const ReadOptions& read_options,
                                    const std::string* fname) const {
   auto table_cache = cfd_->table_cache();
   auto ioptions = cfd_->ioptions();
+  FileOptions fo_copy = file_options_;
+
+  if(read_options.io_activity == Env::IOActivity::kCompaction) {
+    fo_copy.io_options.operation_name = OperationName::kCompactionRead;
+  }
+
   Status s = table_cache->GetTableProperties(
-      file_options_, read_options, cfd_->internal_comparator(), *file_meta, tp,
+      fo_copy, read_options, cfd_->internal_comparator(), *file_meta, tp,
       mutable_cf_options_.block_protection_bytes_per_key,
       mutable_cf_options_.prefix_extractor, true /* no io */);
   if (s.ok()) {
@@ -1563,7 +1569,7 @@ Status Version::GetTableProperties(const ReadOptions& read_options,
     file_name = TableFileName(ioptions->cf_paths, file_meta->fd.GetNumber(),
                               file_meta->fd.GetPathId());
   }
-  s = ioptions->fs->NewRandomAccessFile(file_name, file_options_, &file,
+  s = ioptions->fs->NewRandomAccessFile(file_name, fo_copy, &file,
                                         nullptr);
   if (!s.ok()) {
     return s;

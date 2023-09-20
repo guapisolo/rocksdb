@@ -78,6 +78,7 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile opening file %s\n",
                     filename_.c_str());
     hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_RDONLY, 0, 0, 0);
+    // hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0, options.io_options.operation_name);
     ROCKS_LOG_DEBUG(mylog,
                     "[hdfs] HdfsReadableFile opened file %s hfile_=0x%p\n",
                     filename_.c_str(), hfile_);
@@ -216,6 +217,7 @@ class HdfsWritableFile: public FSWritableFile {
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile opening %s\n",
                     filename_.c_str());
     hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0);
+    // hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0, options.io_options.operation_name);
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile opened %s\n",
                     filename_.c_str());
     assert(hfile_ != nullptr);

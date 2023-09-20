@@ -79,6 +79,17 @@ enum class IOType : uint8_t {
   kInvalid,
 };
 
+enum class OperationName : uint8_t {
+  kRead = 0,
+  kWrite = 1,
+  kCompactionRead = 2,
+  kCompactionWrite = 3,
+  kFlush = 4,
+  kIteratorRead = 5,
+  kMultiGet = 6,
+  kDefault = 7,
+};
+
 // enum representing various operations supported by underlying FileSystem.
 // These need to be set in SupportedOps API for RocksDB to use them.
 enum FSSupportedOps { kAsyncIO, kFSBuffer };
@@ -116,6 +127,10 @@ struct IOOptions {
   // fsync, set this to force the fsync
   bool force_dir_fsync;
 
+  // Name of the operation that is being performed.
+  // Explicitely used to pass to the FS for IO tracing.
+  OperationName operation_name;
+
   // Can be used by underlying file systems to skip recursing through sub
   // directories and list only files in GetChildren API.
   bool do_not_recurse;
@@ -130,6 +145,7 @@ struct IOOptions {
         rate_limiter_priority(Env::IO_TOTAL),
         type(IOType::kUnknown),
         force_dir_fsync(force_dir_fsync_),
+        operation_name(OperationName::kDefault),
         do_not_recurse(false) {}
 };
 

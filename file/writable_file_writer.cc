@@ -363,6 +363,7 @@ IOStatus WritableFileWriter::Flush(Env::IOPriority op_rate_limiter_priority) {
     io_options.rate_limiter_priority =
         WritableFileWriter::DecideRateLimiterPriority(
             writable_file_->GetIOPriority(), op_rate_limiter_priority);
+    io_options.operation_name = OperationName::kFlush;
     s = writable_file_->Flush(io_options, nullptr);
     if (ShouldNotifyListeners()) {
       auto finish_ts = std::chrono::steady_clock::now();

@@ -953,7 +953,9 @@ Status FlushJob::WriteLevel0Table() {
       const SequenceNumber job_snapshot_seq =
           job_context_->GetJobSnapshotSequence();
       const ReadOptions read_options(Env::IOActivity::kFlush);
-      s = BuildTable(dbname_, versions_, db_options_, tboptions, file_options_,
+      FileOptions fo_copy = file_options_;
+      fo_copy.io_options.operation_name = OperationName::kFlush;
+      s = BuildTable(dbname_, versions_, db_options_, tboptions, fo_copy,
                      read_options, cfd_->table_cache(), iter.get(),
                      std::move(range_del_iters), &meta_, &blob_file_additions,
                      existing_snapshots_, earliest_write_conflict_snapshot_,

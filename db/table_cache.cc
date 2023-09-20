@@ -104,6 +104,18 @@ Status TableCache::GetTableReader(
   Status s = PrepareIOFromReadOptions(ro, ioptions_.clock, fopts.io_options);
   TEST_SYNC_POINT_CALLBACK("TableCache::GetTableReader:BeforeOpenFile",
                            const_cast<Status*>(&s));
+  if (ro.io_activity == Env::IOActivity::kGet) {
+    fopts.io_options.operation_name = OperationName::kRead;
+  } 
+  else if (ro.io_activity == Env::IOActivity::kCompaction) {
+    fopts.io_options.operation_name = OperationName::kCompactionRead;
+  }
+  else if (ro.io_activity == Env::IOActivity::kFlush) {
+    fopts.io_options.operation_name = OperationName::kFlush;
+  }
+  else if (ro.io_activity == Env::IOActivity::kMultiGet) {
+    fopts.io_options.operation_name = OperationName::kMultiGet;
+  }
   if (s.ok()) {
     s = ioptions_.fs->NewRandomAccessFile(fname, fopts, &file, nullptr);
   }
