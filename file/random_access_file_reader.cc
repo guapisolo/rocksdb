@@ -121,6 +121,8 @@ IOStatus RandomAccessFileReader::Read(const IOOptions& opts, uint64_t offset,
   }
 
   IOStatus io_s;
+  IOOptions opts_copy = opts;
+  opts_copy.operation_name = OperationName::kRead;
   uint64_t elapsed = 0;
   size_t alignment = file_->GetRequiredBufferAlignment();
   bool is_aligned = false;
@@ -174,7 +176,7 @@ IOStatus RandomAccessFileReader::Read(const IOOptions& opts, uint64_t offset,
           // one iteration of this loop, so we don't need to check and adjust
           // the opts.timeout before calling file_->Read
           assert(!opts.timeout.count() || allowed == read_size);
-          io_s = file_->Read(aligned_offset + buf.CurrentSize(), allowed, opts,
+          io_s = file_->Read(aligned_offset + buf.CurrentSize(), allowed, opts_copy,
                              &tmp, buf.Destination(), nullptr);
         }
         if (ShouldNotifyListeners()) {
@@ -236,7 +238,7 @@ IOStatus RandomAccessFileReader::Read(const IOOptions& opts, uint64_t offset,
           // one iteration of this loop, so we don't need to check and adjust
           // the opts.timeout before calling file_->Read
           assert(!opts.timeout.count() || allowed == n);
-          io_s = file_->Read(offset + pos, allowed, opts, &tmp_result,
+          io_s = file_->Read(offset + pos, allowed, opts_copy, &tmp_result,
                              scratch + pos, nullptr);
         }
         if (ShouldNotifyListeners()) {

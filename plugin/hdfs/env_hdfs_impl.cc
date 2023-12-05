@@ -71,6 +71,7 @@ class HdfsReadableFile : virtual public FSSequentialFile,
   hdfsFS fileSys_;
   std::string filename_;
   hdfsFile hfile_;
+  FileOptions opAwareFOpts;
 
  public:
   HdfsReadableFile(hdfsFS fileSys, const std::string& fname)
@@ -78,7 +79,16 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile opening file %s\n",
                     filename_.c_str());
     hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_RDONLY, 0, 0, 0);
-    // hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0, options.io_options.operation_name);
+    ROCKS_LOG_DEBUG(mylog,
+                    "[hdfs] HdfsReadableFile opened file %s hfile_=0x%p\n",
+                    filename_.c_str(), hfile_);
+  }
+
+  HdfsReadableFile(hdfsFS fileSys, const std::string& fname, const FileOptions& options)
+      : fileSys_(fileSys), filename_(fname), hfile_(nullptr), opAwareFOpts(options) {
+    ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile opening file %s\n",
+                    filename_.c_str());
+    hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_RDONLY, 0, 0, 0);
     ROCKS_LOG_DEBUG(mylog,
                     "[hdfs] HdfsReadableFile opened file %s hfile_=0x%p\n",
                     filename_.c_str(), hfile_);
@@ -97,14 +107,37 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     return hfile_ != nullptr;
   }
 
+  // Convert from enum to string
+  std::string opCodeToString(OperationName opCode) const {
+    switch (opCode) {
+      case OperationName::kRead:            return "0";
+      case OperationName::kWrite:           return "1";
+      case OperationName::kCompactionRead:  return "2";
+      case OperationName::kCompactionWrite: return "3";
+      case OperationName::kFlush:           return "4";
+      case OperationName::kIteratorRead:    return "5";
+      case OperationName::kMultiGet:        return "6";
+      case OperationName::kDefault:         return "7";
+      default:                              return "default";
+    }
+  }
+
   // sequential access, read data at current offset in file
-  IOStatus Read(size_t n, const IOOptions& /*options*/, Slice* result,
+  IOStatus Read(size_t n, const IOOptions& options, Slice* result,
                 char* scratch, IODebugContext* /*dbg*/) override {
     IOStatus s;
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile reading %s %ld\n",
                     filename_.c_str(), n);
 
-    char* buffer = scratch;
+    char* opAwareStr = scratch;
+    // Update with opcode
+    IOOptions ioOpts = options;
+    if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
+      strcat(opAwareStr, opCodeStr.c_str());
+    }
+
+    char* buffer = opAwareStr;
     size_t total_bytes_read = 0;
     tSize bytes_read = 0;
     tSize remaining_bytes = (tSize)n;
@@ -136,18 +169,28 @@ class HdfsReadableFile : virtual public FSSequentialFile,
   }
 
   // random access, read data from specified offset in file
-  IOStatus Read(uint64_t offset, size_t n, const IOOptions& /*options*/,
+  IOStatus Read(uint64_t offset, size_t n, const IOOptions& options,
                 Slice* result, char* scratch,
                 IODebugContext* /*dbg*/) const override {
     IOStatus s;
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile preading %s\n",
                     filename_.c_str());
+
+    char* opAwareStr = scratch;
+    
+    // Update with opcode
+    IOOptions ioOpts = options;
+    if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
+      strcat(opAwareStr, opCodeStr.c_str());
+    }
+
     tSize bytes_read =
-        hdfsPread(fileSys_, hfile_, offset, static_cast<void*>(scratch),
+        hdfsPread(fileSys_, hfile_, offset, static_cast<void*>(opAwareStr),
                   static_cast<tSize>(n));
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile pread %s\n",
                     filename_.c_str());
-    *result = Slice(scratch, (bytes_read < 0) ? 0 : bytes_read);
+    *result = Slice(opAwareStr, (bytes_read < 0) ? 0 : bytes_read);
     if (bytes_read < 0) {
       // An error: return a non-ok status
       s = IOError(filename_, errno);
@@ -206,6 +249,7 @@ class HdfsWritableFile: public FSWritableFile {
   hdfsFS fileSys_;
   std::string filename_;
   hdfsFile hfile_;
+  FileOptions opAwareFOpts;
 
  public:
   HdfsWritableFile(hdfsFS fileSys, const std::string& fname,
@@ -216,6 +260,7 @@ class HdfsWritableFile: public FSWritableFile {
         hfile_(nullptr) {
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile opening %s\n",
                     filename_.c_str());
+    this->opAwareFOpts = options;
     hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0);
     // hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0, options.io_options.operation_name);
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile opened %s\n",
@@ -246,15 +291,38 @@ class HdfsWritableFile: public FSWritableFile {
     return filename_;
   }
 
+  // Convert from enum to string
+  std::string opCodeToString(OperationName opCode) {
+    switch (opCode) {
+      case OperationName::kRead:            return "0";
+      case OperationName::kWrite:           return "1";
+      case OperationName::kCompactionRead:  return "2";
+      case OperationName::kCompactionWrite: return "3";
+      case OperationName::kFlush:           return "4";
+      case OperationName::kIteratorRead:    return "5";
+      case OperationName::kMultiGet:        return "6";
+      case OperationName::kDefault:         return "7";
+      default:                              return "default";
+    }
+  }
+
   IOStatus Append(const Slice& data, const IOOptions& /*options*/,
                   IODebugContext* /*dbg*/) override {
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile Append %s\n",
                     filename_.c_str());
-    const char* src = data.data();
-    size_t left = data.size();
+    std::string opAwareStr = data.ToString();
+
+    if (data.size() != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
+      FileOptions foptsloc = this->opAwareFOpts;
+      opAwareStr = opAwareStr + "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
+    }
+
+    const char* src = opAwareStr.data();
+    size_t left = opAwareStr.size();
     size_t ret = hdfsWrite(fileSys_, hfile_, src, static_cast<tSize>(left));
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile Appended %s\n",
                     filename_.c_str());
+    opAwareStr.clear();
     if (ret != left) {
       return IOError(filename_, errno);
     }
@@ -458,11 +526,11 @@ Status HdfsFileSystem::ValidateOptions(const DBOptions& db_opts,
   
 // open a file for sequential reading
 IOStatus HdfsFileSystem::NewSequentialFile(const std::string& fname,
-                                               const FileOptions& /*options*/,
+                                               const FileOptions& options,
                                                std::unique_ptr<FSSequentialFile>* result,
                                                IODebugContext* /*dbg*/) {
   result->reset();
-  HdfsReadableFile* f = new HdfsReadableFile(fileSys_, fname);
+  HdfsReadableFile* f = new HdfsReadableFile(fileSys_, fname, options);
   if (f == nullptr || !f->isValid()) {
     delete f;
     *result = nullptr;
@@ -474,11 +542,11 @@ IOStatus HdfsFileSystem::NewSequentialFile(const std::string& fname,
 
 // open a file for random reading
 IOStatus HdfsFileSystem::NewRandomAccessFile(const std::string& fname,
-                                                 const FileOptions& /*options*/,
+                                                 const FileOptions& options,
                                                  std::unique_ptr<FSRandomAccessFile>* result,
                                                  IODebugContext* /*dbg*/) {
   result->reset();
-  HdfsReadableFile* f = new HdfsReadableFile(fileSys_, fname);
+  HdfsReadableFile* f = new HdfsReadableFile(fileSys_, fname, options);
   if (f == nullptr || !f->isValid()) {
     delete f;
     *result = nullptr;

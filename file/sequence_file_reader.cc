@@ -75,8 +75,10 @@ IOStatus SequentialFileReader::Read(size_t n, Slice* result, char* scratch,
         orig_offset = aligned_offset + buf.CurrentSize();
         start_ts = FileOperationInfo::StartNow();
       }
+      IOOptions opAware_opts;
+      opAware_opts.operation_name = OperationName::kRead;
       io_s = file_->PositionedRead(aligned_offset + buf.CurrentSize(), allowed,
-                                   IOOptions(), &tmp, buf.Destination(),
+                                   opAware_opts, &tmp, buf.Destination(),
                                    nullptr /* dbg */);
       if (ShouldNotifyListeners()) {
         auto finish_ts = FileOperationInfo::FinishNow();
@@ -119,7 +121,9 @@ IOStatus SequentialFileReader::Read(size_t n, Slice* result, char* scratch,
         start_ts = FileOperationInfo::StartNow();
       }
       Slice tmp;
-      io_s = file_->Read(allowed, IOOptions(), &tmp, scratch + read,
+      IOOptions opAware_opts;
+      opAware_opts.operation_name = OperationName::kRead;
+      io_s = file_->Read(allowed, opAware_opts, &tmp, scratch + read,
                          nullptr /* dbg */);
       if (ShouldNotifyListeners()) {
         auto finish_ts = FileOperationInfo::FinishNow();
@@ -171,6 +175,7 @@ class ReadaheadSequentialFile : public FSSequentialFile {
   IOStatus Read(size_t n, const IOOptions& opts, Slice* result, char* scratch,
                 IODebugContext* dbg) override {
     std::unique_lock<std::mutex> lk(lock_);
+    IOOptions opts_copy = opts;
 
     size_t cached_len = 0;
     // Check if there is a cache hit, meaning that [offset, offset + n) is
@@ -188,7 +193,8 @@ class ReadaheadSequentialFile : public FSSequentialFile {
     IOStatus s;
     // Read-ahead only make sense if we have some slack left after reading
     if (n + alignment_ >= readahead_size_) {
-      s = file_->Read(n, opts, result, scratch + cached_len, dbg);
+      opts_copy.operation_name = OperationName::kRead;
+      s = file_->Read(n, opts_copy, result, scratch + cached_len, dbg);
       if (s.ok()) {
         read_offset_ += result->size();
         *result = Slice(scratch, cached_len + result->size());
@@ -197,7 +203,8 @@ class ReadaheadSequentialFile : public FSSequentialFile {
       return s;
     }
 
-    s = ReadIntoBuffer(readahead_size_, opts, dbg);
+    opts_copy.operation_name = OperationName::kRead;
+    s = ReadIntoBuffer(readahead_size_, opts_copy, dbg);
     if (s.ok()) {
       // The data we need is now in cache, so we can safely read it
       size_t remaining_len;
