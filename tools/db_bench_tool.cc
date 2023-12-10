@@ -91,6 +91,13 @@
 #include "utilities/merge_operators/sortlist.h"
 #include "utilities/persistent_cache/block_cache_tier.h"
 
+// For JsonConfigured Benchmark
+#include <chrono>
+#include <vector>
+#include <fstream>
+#include "json.hpp"
+#include "port/sys_time.h"
+
 #ifdef MEMKIND
 #include "memory/memkind_kmem_allocator.h"
 #endif
@@ -103,6 +110,7 @@ using GFLAGS_NAMESPACE::ParseCommandLineFlags;
 using GFLAGS_NAMESPACE::RegisterFlagValidator;
 using GFLAGS_NAMESPACE::SetUsageMessage;
 using GFLAGS_NAMESPACE::SetVersionString;
+using json = nlohmann::json;
 
 DEFINE_string(
     benchmarks,
@@ -155,7 +163,8 @@ DEFINE_string(
     "getmergeoperands,",
     "readrandomoperands,"
     "backup,"
-    "restore"
+    "restore,"
+    "jsonconfigured"
 
     "Comma-separated list of operations to run in the specified"
     " order. Available benchmarks:\n"
@@ -244,9 +253,10 @@ DEFINE_string(
     "have ever been seen by the thread (or eight initially)\n"
     "\tbackup --  Create a backup of the current DB and verify that a new backup is corrected. "
     "Rate limit can be specified through --backup_rate_limit\n"
-    "\trestore -- Restore the DB from the latest backup available, rate limit can be specified through --restore_rate_limit\n");
+    "\trestore -- Restore the DB from the latest backup available, rate limit can be specified through --restore_rate_limit\n"
+    "\tjsonconfigured -- Run the benchmarks specified in a json file.");
 
-DEFINE_int64(num, 1000000, "Number of key/values to place in database");
+DEFINE_int64(num, 10000000000, "Number of key/values to place in database");
 
 DEFINE_int64(numdistinct, 1000,
              "Number of distinct keys to use. Used in RandomWithVerify to "
@@ -1243,6 +1253,10 @@ DEFINE_uint64(
     "num_file_reads_for_auto_readahead indicates after how many sequential "
     "reads into that file internal auto prefetching should be start.");
 
+DEFINE_string(
+    json_file_path, "",
+    "If not empty string, use the given file path for json output.");
+
 static enum ROCKSDB_NAMESPACE::CompressionType StringToCompressionType(
     const char* ctype) {
   assert(ctype);
@@ -1360,7 +1374,7 @@ DEFINE_int64(stats_interval, 0,
              "Stats are reported every N operations when this is greater than "
              "zero. When 0 the interval grows over time.");
 
-DEFINE_int64(stats_interval_seconds, 0,
+DEFINE_int64(stats_interval_seconds, 1,
              "Report stats every N seconds. This overrides stats_interval when"
              " both are > 0.");
 
@@ -2274,7 +2288,7 @@ class Stats {
           next_report_ += 50000;
         else
           next_report_ += 100000;
-        fprintf(stderr, "... finished %" PRIu64 " ops%30s\r", done_, "");
+        fprintf(stdout, "... finished %" PRIu64 " ops%30s\r", done_, "");
       } else {
         uint64_t now = clock_->NowMicros();
         int64_t usecs_since_last = now - last_report_finish_;
@@ -2288,8 +2302,8 @@ class Stats {
           next_report_ += FLAGS_stats_interval;
 
         } else {
-          fprintf(stderr,
-                  "%s ... thread %d: (%" PRIu64 ",%" PRIu64
+          fprintf(stdout,
+                  "\t%s ... thread %d: (%" PRIu64 ",%" PRIu64
                   ") ops and "
                   "(%.1f,%.1f) ops/second in (%.6f,%.6f) seconds\n",
                   clock_->TimeToString(now / 1000000).c_str(), id_,
@@ -2298,6 +2312,17 @@ class Stats {
                   done_ / ((now - start_) / 1000000.0),
                   (now - last_report_finish_) / 1000000.0,
                   (now - start_) / 1000000.0);
+
+          port::TimeVal now_timeval;
+          port::GetTimeOfDay(&now_timeval, nullptr);
+          
+          fprintf(stderr,
+                  "%s.%06d\t%" PRIu64 "\t%" PRIu64"\twrite\t%.6f\t%.1f\t\n",
+                  clock_->TimeToString(now / 1000000).c_str(),
+                  static_cast<int>(now_timeval.tv_usec),
+                  last_report_finish_, now,
+                  (now - last_report_finish_) / 1000000.0,
+                  (done_ - last_report_done_) / (usecs_since_last / 1000000.0));
 
           if (id_ == 0 && FLAGS_stats_per_interval) {
             std::string stats;
@@ -2866,7 +2891,7 @@ class Benchmark {
 #endif
 
   void PrintEnvironment() {
-    fprintf(stderr, "RocksDB:    version %s\n",
+    fprintf(stdout, "RocksDB:    version %s\n",
             GetRocksVersionAsString(true).c_str());
 
 #if defined(__linux) || defined(__APPLE__) || defined(__FreeBSD__)
@@ -2874,7 +2899,7 @@ class Benchmark {
     char buf[52];
     // Lint complains about ctime() usage, so replace it with ctime_r(). The
     // requirement is to provide a buffer which is at least 26 bytes.
-    fprintf(stderr, "Date:       %s",
+    fprintf(stdout, "Date:       %s",
             ctime_r(&now, buf));  // ctime_r() adds newline
 
 #if defined(__linux)
@@ -2899,8 +2924,8 @@ class Benchmark {
         }
       }
       fclose(cpuinfo);
-      fprintf(stderr, "CPU:        %d * %s\n", num_cpus, cpu_type.c_str());
-      fprintf(stderr, "CPUCache:   %s\n", cache_size.c_str());
+      fprintf(stdout, "CPU:        %d * %s\n", num_cpus, cpu_type.c_str());
+      fprintf(stdout, "CPUCache:   %s\n", cache_size.c_str());
     }
 #elif defined(__APPLE__)
     struct host_basic_info h;
@@ -3644,6 +3669,8 @@ class Benchmark {
         method = &Benchmark::Backup;
       } else if (name == "restore") {
         method = &Benchmark::Restore;
+      } else if (name == "jsonconfigured") {
+        method = &Benchmark::JsonConfigured;
       } else if (!name.empty()) {  // No error message for empty name
         fprintf(stderr, "unknown benchmark '%s'\n", name.c_str());
         ErrorExit();
@@ -4990,7 +5017,8 @@ class Benchmark {
   }
 
   void DoWrite(ThreadState* thread, WriteMode write_mode) {
-    const int test_duration = write_mode == RANDOM ? FLAGS_duration : 0;
+    // const int test_duration = write_mode == RANDOM ? FLAGS_duration : 0;
+    const int test_duration = FLAGS_duration;
     const int64_t num_ops = writes_ == 0 ? num_ : writes_;
 
     size_t num_key_gens = 1;
@@ -8102,6 +8130,16 @@ class Benchmark {
     db->CompactRange(cro, nullptr, nullptr);
   }
 
+  void MasterManualCompaction(ThreadState* thread) {
+    DB* db = SelectDB(thread);
+    CompactRangeOptions cro;
+    cro.max_subcompactions = 4;
+    cro.exclusive_manual_compaction = true;
+    cro.bottommost_level_compaction = BottommostLevelCompaction::kSkip;
+    // cro.max_subcompactions = static_cast<uint32_t>(FLAGS_subcompactions);
+    db->CompactRange(cro, nullptr, nullptr);
+  }
+
   void CompactAll() {
     CompactRangeOptions cro;
     cro.max_subcompactions = static_cast<uint32_t>(FLAGS_subcompactions);
@@ -8461,6 +8499,79 @@ class Benchmark {
     delete backup_engine;
   }
 
+  void JsonThreadedBenchmark(ThreadState* thread, const json& benchmark) {
+  // void static JsonThreadedBenchmark(const json& benchmark) {
+    // void (Benchmark::*method)(ThreadState*) = nullptr;
+    // Print the infor in the json benchmark object
+    std::cout << "Benchmark: " << benchmark["benchmark"] << std::endl;
+    std::cout << "----------------------------------" << std::endl;
+    std::cout << "Throughput: " << benchmark["throughput"] << std::endl;
+    std::cout << "Start Time: " << benchmark["start_time"] << std::endl;
+    std::cout << "Duration: " << benchmark["duration"] << std::endl;
+    std::cout << "----------------------------------" << std::endl;
+
+    std::string name = benchmark["benchmark"].get<std::string>();
+    std::int64_t throughput = benchmark["throughput"].get<int>();
+    int size_write = FLAGS_key_size + FLAGS_value_size;
+
+    FLAGS_benchmark_write_rate_limit = throughput * size_write;
+    FLAGS_duration = benchmark["duration"].get<int>();
+
+    thread->shared->write_rate_limiter.reset(
+          NewGenericRateLimiter(FLAGS_benchmark_write_rate_limit));
+
+    // Run the benchmark in the current thread
+    if (name == "fillseq") {
+      WriteSeq(thread);
+    } else if (name == "fillrandom") {
+      WriteRandom(thread);
+    } else if (name == "compactall") {
+      CompactAll();
+    } else if (name == "compact0") {
+      CompactLevel(0);
+    } else if (name == "compact1") {
+      CompactLevel(1);
+    } else if (name == "master-compact") {
+      MasterManualCompaction(thread);
+    }
+  }
+
+  void JsonConfigured(ThreadState* thread_bm) {
+    // Parse the JSON configuration file
+    std::ifstream json_file(FLAGS_json_file_path);
+    std::cout << "Reading JSON file: " << FLAGS_json_file_path << std::endl;
+    if (!json_file.is_open()) {
+      std::cout << "Failed to open input.json." << std::endl;
+      exit(1);
+    }
+
+    json data = json::parse(json_file);
+    auto test_start_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    std::vector<std::thread> threads;
+
+    for (auto& benchmark : data["benchmarks"]) {
+      
+      auto current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() - test_start_time;
+      auto start_time = benchmark["start_time"].get<int>();
+      auto delay = start_time - current_time;
+
+      if (delay > 0) {
+          // Sleep to wait until the start time
+          std::this_thread::sleep_for(std::chrono::seconds(delay));
+      }
+
+      // Create a thread to process the task
+      threads.emplace_back(&Benchmark::JsonThreadedBenchmark, this, thread_bm, std::ref(benchmark));
+      // threads.emplace_back(&Benchmark::JsonThreadedBenchmark, thread, std::ref(benchmark));
+    }
+    
+    // Wait for all threads to finish
+    for (auto& thread_int : threads) {
+        thread_int.join();
+    }
+
+    json_file.close();
+  }
 };
 
 int db_bench_tool(int argc, char** argv) {

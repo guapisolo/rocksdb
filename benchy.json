@@ -1,0 +1,28 @@
+{
+    "benchmarks": [
+        {
+            "benchmark": "fillrandom",
+            "throughput": 270000,
+            "start_time": 0,
+            "duration": 50
+        },
+        {
+            "benchmark": "fillrandom",
+            "throughput": 200000,
+            "start_time": 50,
+            "duration": 50
+        },
+        {
+            "benchmark": "master-compact",
+            "throughput": 200000,
+            "start_time": 52,
+            "duration": 50
+        },
+        {
+            "benchmark": "fillrandom",
+            "throughput": 270000,
+            "start_time": 100,
+            "duration": 50
+        }
+    ]
+}

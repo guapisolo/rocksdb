@@ -47,6 +47,9 @@
 #include "util/mutexlock.h"
 #include "util/stop_watch.h"
 
+#include "port/sys_time.h"
+#include "util/string_util.h"
+
 namespace ROCKSDB_NAMESPACE {
 
 const char* GetFlushReasonString(FlushReason flush_reason) {
@@ -79,6 +82,8 @@ const char* GetFlushReasonString(FlushReason flush_reason) {
       return "Error Recovery Retry Flush";
     case FlushReason::kWalFull:
       return "WAL Full";
+    case FlushReason::kCatchUpAfterErrorRecovery:
+      return "Catch Up After Error Recovery";
     default:
       return "Invalid";
   }
@@ -215,7 +220,8 @@ void FlushJob::PickMemTable() {
 }
 
 Status FlushJob::Run(LogsWithPrepTracker* prep_tracker, FileMetaData* file_meta,
-                     bool* switched_to_mempurge) {
+                     bool* switched_to_mempurge, bool* skipped_since_bg_error,
+                     ErrorHandler* error_handler) {
   TEST_SYNC_POINT("FlushJob::Start");
   db_mutex_->AssertHeld();
   assert(pick_memtable_called);
@@ -303,17 +309,32 @@ Status FlushJob::Run(LogsWithPrepTracker* prep_tracker, FileMetaData* file_meta,
   }
 
   if (!s.ok()) {
-    cfd_->imm()->RollbackMemtableFlush(mems_, meta_.fd.GetNumber());
+    cfd_->imm()->RollbackMemtableFlush(
+        mems_, /*rollback_succeeding_memtables=*/!db_options_.atomic_flush);
   } else if (write_manifest_) {
-    TEST_SYNC_POINT("FlushJob::InstallResults");
-    // Replace immutable memtable with the generated Table
-    s = cfd_->imm()->TryInstallMemtableFlushResults(
-        cfd_, mutable_cf_options_, mems_, prep_tracker, versions_, db_mutex_,
-        meta_.fd.GetNumber(), &job_context_->memtables_to_free, db_directory_,
-        log_buffer_, &committed_flush_jobs_info_,
-        !(mempurge_s.ok()) /* write_edit : true if no mempurge happened (or if aborted),
+    assert(!db_options_.atomic_flush);
+    if (!db_options_.atomic_flush &&
+        flush_reason_ != FlushReason::kErrorRecovery &&
+        flush_reason_ != FlushReason::kErrorRecoveryRetryFlush &&
+        error_handler && !error_handler->GetBGError().ok() &&
+        error_handler->IsBGWorkStopped()) {
+      cfd_->imm()->RollbackMemtableFlush(
+          mems_, /*rollback_succeeding_memtables=*/!db_options_.atomic_flush);
+      s = error_handler->GetBGError();
+      if (skipped_since_bg_error) {
+        *skipped_since_bg_error = true;
+      }
+    } else {
+      TEST_SYNC_POINT("FlushJob::InstallResults");
+      // Replace immutable memtable with the generated Table
+      s = cfd_->imm()->TryInstallMemtableFlushResults(
+              cfd_, mutable_cf_options_, mems_, prep_tracker, versions_, db_mutex_,
+              meta_.fd.GetNumber(), &job_context_->memtables_to_free, db_directory_,
+              log_buffer_, &committed_flush_jobs_info_,
+              !(mempurge_s.ok()) /* write_edit : true if no mempurge happened (or if aborted),
                               but 'false' if mempurge successful: no new min log number
                               or new level 0 file path to write to manifest. */);
+    }
   }
 
   if (s.ok() && file_meta != nullptr) {
@@ -900,6 +921,13 @@ Status FlushJob::WriteLevel0Table() {
                          << total_num_range_deletes << "flush_reason"
                          << GetFlushReasonString(flush_reason_);
 
+    // Same in a tsv stderr
+    fprintf(stderr, "%s\tFlush\tStart\t%" PRIu64 "\t%s\t%" PRIu64 "\t%zu\n",
+            TimeToStringMicros(start_micros).c_str(),
+            start_micros,
+            GetFlushReasonString(flush_reason_),
+            total_data_size, total_memory_usage);
+
     {
       ScopedArenaIterator iter(
           NewMergingIterator(&cfd_->internal_comparator(), memtables.data(),
@@ -965,6 +993,7 @@ Status FlushJob::WriteLevel0Table() {
                      &table_properties_, write_hint, full_history_ts_low,
                      blob_callback_, base_, &num_input_entries,
                      &memtable_payload_bytes, &memtable_garbage_bytes);
+      TEST_SYNC_POINT_CALLBACK("FlushJob::WriteLevel0Table:s", &s);
       // TODO: Cleanup io_status in BuildTable and table builders
       assert(!s.ok() || io_s.ok());
       io_s.PermitUncheckedError();
@@ -1044,6 +1073,11 @@ Status FlushJob::WriteLevel0Table() {
                  " microseconds, and %" PRIu64 " cpu microseconds.\n",
                  cfd_->GetName().c_str(), job_context_->job_id, micros,
                  cpu_micros);
+
+  // Now the same in stderr
+  fprintf(stderr, "%s\tFlush\tEnd\t%" PRIu64 "\t%" PRIu64 "\n",
+        TimeToStringMicros(clock_->NowMicros()).c_str(),
+        clock_->NowMicros(), micros);
 
   if (has_output) {
     stats.bytes_written = meta_.fd.GetFileSize();

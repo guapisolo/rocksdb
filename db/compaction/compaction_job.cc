@@ -979,11 +979,21 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   }
 
   stream << "lsm_state";
+  std::string level_str;
   stream.StartArray();
   for (int level = 0; level < vstorage->num_levels(); ++level) {
     stream << vstorage->NumLevelFiles(level);
+    level_str += std::to_string(vstorage->NumLevelFiles(level)) + ',';
   }
   stream.EndArray();
+
+  // In tab seperated format in stderr
+  // |time|flush|reason|size|memory use|time taken|ops/sec|levels
+  fprintf(stderr, "%s\tCompaction\tEnd\t%" PRIu64 "\t%" PRIu64 "\t\t%" PRIu64 "\t%s\n",
+          TimeToStringMicros(env_->NowMicros()).c_str(),
+          env_->NowMicros(), stats.micros, 
+          stats.bytes_written, level_str.c_str());
+
 
   if (!blob_files.empty()) {
     assert(blob_files.front());
@@ -2064,6 +2074,14 @@ void CompactionJob::LogCompaction() {
            << "compaction_started"
            << "compaction_reason"
            << GetCompactionReasonString(compaction->compaction_reason());
+
+    // in stderr now
+    // |time|flush|reason|size|memory use|time taken| ops/sec
+    fprintf(stderr, "%s\tCompaction\tStart\t%" PRIu64 "\t%s\n",
+            TimeToStringMicros(env_->NowMicros()).c_str(),
+            env_->NowMicros(),
+            GetCompactionReasonString(compaction->compaction_reason()));
+
     for (size_t i = 0; i < compaction->num_input_levels(); ++i) {
       stream << ("files_L" + std::to_string(compaction->level(i)));
       stream.StartArray();

@@ -97,3 +97,8 @@ cmake-build-*
 third-party/folly/
 .cache
 *.sublime-*
+
+# Ignore the output folder 
+output_db/*
+outfiles/*
+!outfiles/outfile.py
