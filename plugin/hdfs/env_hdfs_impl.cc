@@ -135,6 +135,10 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
       std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
       strcat(opAwareStr, opCodeStr.c_str());
+    } else if (n != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
+      FileOptions foptsloc = this->opAwareFOpts;
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
+      strcat(opAwareStr, opCodeStr.c_str());
     }
 
     char* buffer = opAwareStr;
@@ -182,6 +186,10 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     IOOptions ioOpts = options;
     if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
       std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
+      strcat(opAwareStr, opCodeStr.c_str());
+    } else if (n != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
+      FileOptions foptsloc = this->opAwareFOpts;
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
       strcat(opAwareStr, opCodeStr.c_str());
     }
 
