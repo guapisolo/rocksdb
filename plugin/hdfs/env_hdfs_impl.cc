@@ -129,16 +129,25 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile reading %s %ld\n",
                     filename_.c_str(), n);
 
-    char* opAwareStr = scratch;
+    char* opAwareStr = nullptr;
+
     // Update with opcode
     IOOptions ioOpts = options;
     if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
       std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
-      strcat(opAwareStr, opCodeStr.c_str());
+      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
+      strcpy(opAwareStr, opCodeStr.c_str());
     } else if (n != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
       FileOptions foptsloc = this->opAwareFOpts;
       std::string opCodeStr = "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
-      strcat(opAwareStr, opCodeStr.c_str());
+      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
+      strcpy(opAwareStr, opCodeStr.c_str());
+    }
+
+    if (opAwareStr == nullptr) {
+      opAwareStr = scratch;
+    } else {
+      strcat(opAwareStr, scratch);
     }
 
     char* buffer = opAwareStr;
@@ -180,17 +189,25 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile preading %s\n",
                     filename_.c_str());
 
-    char* opAwareStr = scratch;
-    
+    char* opAwareStr = nullptr;
+
     // Update with opcode
     IOOptions ioOpts = options;
     if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
       std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
-      strcat(opAwareStr, opCodeStr.c_str());
+      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
+      strcpy(opAwareStr, opCodeStr.c_str());
     } else if (n != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
       FileOptions foptsloc = this->opAwareFOpts;
       std::string opCodeStr = "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
-      strcat(opAwareStr, opCodeStr.c_str());
+      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
+      strcpy(opAwareStr, opCodeStr.c_str());
+    }
+
+    if (opAwareStr == nullptr) {
+      opAwareStr = scratch;
+    } else {
+      strcat(opAwareStr, scratch);
     }
 
     tSize bytes_read =
