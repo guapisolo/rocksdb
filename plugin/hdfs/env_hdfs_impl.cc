@@ -129,25 +129,24 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile reading %s %ld\n",
                     filename_.c_str(), n);
 
-    char* opAwareStr = nullptr;
+    char* opAwareStr = scratch;
 
-    // Update with opcode
-    IOOptions ioOpts = options;
-    if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
-      std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
-      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
-      strcpy(opAwareStr, opCodeStr.c_str());
+    if (n != 0 && opCodeToString(options.operation_name) != "7") {
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(options.operation_name);
+      fprintf(stderr, "opCodeStr: %s\n", opCodeStr.c_str());
+      strcat(opAwareStr, opCodeStr.c_str());
+      // Shift contents to make space for opCodeStr at the beginning
+      memmove(opAwareStr + opCodeStr.length(), opAwareStr, strlen(opAwareStr) + 1);
+      // Copy opCodeStr to the beginning of opAwareStr
+      memcpy(opAwareStr, opCodeStr.c_str(), opCodeStr.length());
     } else if (n != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
-      FileOptions foptsloc = this->opAwareFOpts;
-      std::string opCodeStr = "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
-      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
-      strcpy(opAwareStr, opCodeStr.c_str());
-    }
-
-    if (opAwareStr == nullptr) {
-      opAwareStr = scratch;
-    } else {
-      strcat(opAwareStr, scratch);
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(this->opAwareFOpts.io_options.operation_name);
+      fprintf(stderr, "opCodeStr: %s\n", opCodeStr.c_str());
+      strcat(opAwareStr, opCodeStr.c_str());
+      // Shift contents to make space for opCodeStr at the beginning
+      memmove(opAwareStr + opCodeStr.length(), opAwareStr, strlen(opAwareStr) + 1);
+      // Copy opCodeStr to the beginning of opAwareStr
+      memcpy(opAwareStr, opCodeStr.c_str(), opCodeStr.length());
     }
 
     char* buffer = opAwareStr;
@@ -189,25 +188,24 @@ class HdfsReadableFile : virtual public FSSequentialFile,
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsReadableFile preading %s\n",
                     filename_.c_str());
 
-    char* opAwareStr = nullptr;
+    char* opAwareStr = scratch;
 
-    // Update with opcode
-    IOOptions ioOpts = options;
-    if (n != 0 && opCodeToString(ioOpts.operation_name) != "7") {
-      std::string opCodeStr = "$/0/0opCode" + opCodeToString(ioOpts.operation_name);
-      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
-      strcpy(opAwareStr, opCodeStr.c_str());
+    if (n != 0 && opCodeToString(options.operation_name) != "7") {
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(options.operation_name);
+      fprintf(stderr, "opCodeStr: %s\n", opCodeStr.c_str());
+      strcat(opAwareStr, opCodeStr.c_str());
+      // Shift contents to make space for opCodeStr at the beginning
+      memmove(opAwareStr + opCodeStr.length(), opAwareStr, strlen(opAwareStr) + 1);
+      // Copy opCodeStr to the beginning of opAwareStr
+      memcpy(opAwareStr, opCodeStr.c_str(), opCodeStr.length());
     } else if (n != 0 && opCodeToString(this->opAwareFOpts.io_options.operation_name) != "7") {
-      FileOptions foptsloc = this->opAwareFOpts;
-      std::string opCodeStr = "$/0/0opCode" + opCodeToString(foptsloc.io_options.operation_name);
-      opAwareStr = new char[opCodeStr.size() + strlen(scratch) + 1];
-      strcpy(opAwareStr, opCodeStr.c_str());
-    }
-
-    if (opAwareStr == nullptr) {
-      opAwareStr = scratch;
-    } else {
-      strcat(opAwareStr, scratch);
+      std::string opCodeStr = "$/0/0opCode" + opCodeToString(this->opAwareFOpts.io_options.operation_name);
+      fprintf(stderr, "opCodeStr: %s\n", opCodeStr.c_str());
+      strcat(opAwareStr, opCodeStr.c_str());
+      // Shift contents to make space for opCodeStr at the beginning
+      memmove(opAwareStr + opCodeStr.length(), opAwareStr, strlen(opAwareStr) + 1);
+      // Copy opCodeStr to the beginning of opAwareStr
+      memcpy(opAwareStr, opCodeStr.c_str(), opCodeStr.length());
     }
 
     tSize bytes_read =
