@@ -2,18 +2,16 @@
 #include <memory>
 #include <string>
 #include <thread>
+
+// GRPC
 #include <grpcpp/grpcpp.h>
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
-#include <grpcpp/health_check_service_interface.h>
-#include <grpcpp/ext/proto_server_reflection_plugin.h>
-#include <grpcpp/server.h>
-#include <grpcpp/server_builder.h>
-#include <grpcpp/server_context.h>
-#include <grpcpp/security/server_credentials.h>
+#include "netservice.grpc.pb.h"
+
+// RocksDB
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
-#include "NetService.grpc.pb.h"
 
+// UDP
 #include <bits/stdc++.h> 
 #include <stdlib.h> 
 #include <unistd.h> 
@@ -28,9 +26,9 @@ using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
 
-using Net::OperationRequest;
-using Net::OperationResponse;
-using Net::NetService;
+using netservice::OperationRequest;
+using netservice::OperationResponse;
+using netservice::NetService;
 
 // queue shared across multiple thread
 std::queue<std::string> optimizationQueue;
@@ -51,7 +49,7 @@ public:
         delete db_;
     }
 
-    Status RunNetService(ServerContext* context, const OperationRequest* request,
+    Status OperationService(ServerContext* context, const OperationRequest* request,
                              OperationResponse* response) override {
         // Maybe just implement a data structure here and have another piece of code that actually does the operation?
         switch (request->operation()) {
@@ -83,16 +81,6 @@ public:
                 }
                 break;
             }
-            case OperationRequest::SCAN: {
-                std::unique_ptr<rocksdb::Iterator> it(db_->NewIterator(rocksdb::ReadOptions()));
-                std::string result;
-                // Note: This has not been implemented yet. There is nothing from the request yet.
-                for (it->SeekToFirst(); it->Valid(); it->Next()) {
-                    result += it->key().ToString() + ": " + it->value().ToString() + "\n";
-                }
-                response->set_result(result);
-                break;
-            }
             default:
                 response->set_result("Unknown operation");
         }
@@ -111,8 +99,8 @@ void RunServer(const std::string& server_address, const std::string& db_path, in
     builder.RegisterService(&service);
 
     // Create and attach a thread pool to the server
-    std::shared_ptr<grpc::ThreadPoolInterface> thread_pool = grpc::CreateDefaultThreadPool(thread_pool_size);
-    builder.SetThreadPool(thread_pool);
+    // std::shared_ptr<grpc::ThreadPoolInterface> thread_pool = grpc::CreateDefaultThreadPool(thread_pool_size);
+    // builder.SetThreadPool(thread_pool);
 
     std::unique_ptr<Server> server(builder.BuildAndStart());
     std::cout << "Server listening on " << server_address << std::endl;
@@ -121,7 +109,7 @@ void RunServer(const std::string& server_address, const std::string& db_path, in
 
 
 // An additional UDP server to constantly listen for Optimization requests.
-void RunUDPServer(const std::string& server_address) {
+void RunUDPServer() {
     int sockfd; 
     char buffer[1024]; 
     struct sockaddr_in servaddr, cliaddr; 
@@ -145,15 +133,17 @@ void RunUDPServer(const std::string& server_address) {
     }
 
     while (true) {
-        senderAddrSize = sizeof(senderAddr);
-        bytesReceived = recvfrom(serverSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&senderAddr, &senderAddrSize);
+        socklen_t cliAddrSize = sizeof(cliaddr);
+        int bytesReceived = recvfrom(sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&cliaddr, &cliAddrSize);
         if (bytesReceived < 0) {
             std::cerr << "Error receiving data." << std::endl;
             continue;
         }
 
+        buffer[bytesReceived] = '\0';
         optimizationQueue.push(buffer);
         std::cout << "Received data: " << buffer << std::endl;
+        buffer[0] = '\0';
     }
  
     close(sockfd); 
@@ -171,14 +161,10 @@ void RunOptimizationService() {
 }
 
 
-int main(int argc, char** argv) {
-    if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <server_address> <db_path> <thread_pool_size>" << std::endl;
-        return 1;
-    }
-    std::string server_address(argv[1]);
-    std::string db_path(argv[2]);
-    int thread_pool_size = std::stoi(argv[3]);
+int main() {
+    std::string server_address = "0.0.0.0:50050";
+    std::string db_path = "/data/viraj/tmp_db";
+    int thread_pool_size = 10;
  
     // Create a thread to run the UDP server
     std::thread udp_server(RunUDPServer);
