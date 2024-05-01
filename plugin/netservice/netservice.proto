@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package netservice;
+
+service NetService {
+  rpc GetService(OperationRequest) returns (OperationResponse) {}
+  rpc PutService(OperationRequest) returns (OperationResponse) {}
+  rpc DeleteService(OperationRequest) returns (OperationResponse) {}
+  rpc ScanService(OperationRequest) returns (OperationResponse) {}
+}
+
+message OperationRequest {
+  enum Operation {
+    PUT = 0;
+    GET = 1;
+    DELETE = 2;
+    SCAN = 3;
+  }
+  Operation operation = 1;
+  string key = 2;
+  string value = 3;
+}
+
+message OperationResponse {
+  string result = 1;
+}
