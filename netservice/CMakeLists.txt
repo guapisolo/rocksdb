@@ -40,16 +40,6 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 set(_GRPC_GRPCPP gRPC::grpc++)
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 
-# RocksDB
-add_library(rocksdb STATIC IMPORTED)
-set_target_properties(rocksdb PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../librocksdb.a)
-link_libraries(lz4 snappy bz2)
-
-# HDFS
-add_library(hdfs STATIC IMPORTED)
-set_target_properties(hdfs PROPERTIES IMPORTED_LOCATION ${HADOOP_HOME}/lib/native/libhdfs.so)
-link_directories(${HADOOP_HOME}/lib/native)
-
 # Proto file
 get_filename_component(ns_proto "./netservice.proto" ABSOLUTE)
 get_filename_component(ns_proto_path "${ns_proto}" PATH)
@@ -60,10 +50,6 @@ set(ns_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/netservice.pb.cc")
 set(ns_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/netservice.pb.h")
 set(ns_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/netservice.grpc.pb.cc")
 set(ns_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/netservice.grpc.pb.h")
-
-# Additional source files
-set(ns_client_src "${CMAKE_CURRENT_SOURCE_DIR}/rdb_client.cc")
-set(ns_client_hdr "${CMAKE_CURRENT_SOURCE_DIR}/rdb_client.h")
 
 add_custom_command(
       OUTPUT "${ns_proto_srcs}" "${ns_proto_hdrs}" "${ns_grpc_srcs}" "${ns_grpc_hdrs}" "${ns_client_src}" "${ns_client_hdr}"
@@ -87,9 +73,7 @@ add_library(netservice
   ${ns_grpc_srcs}
   ${ns_grpc_hdrs}
   ${ns_proto_srcs}
-  ${ns_proto_hdrs}
-  ${ns_client_src}
-  ${ns_client_hdr})
+  ${ns_proto_hdrs})
 
 target_link_libraries(netservice
   absl::check
@@ -98,24 +82,18 @@ target_link_libraries(netservice
   ${_PROTOBUF_LIBPROTOBUF})
 
 # Targets rdb_[async_](client|server)
-foreach(_target
-  rdb_server)
-  add_executable(${_target} "${_target}.cc")
-  target_link_libraries(${_target}
-    netservice
-    absl::check
-    absl::flags
-    absl::flags_parse
-    absl::log
-    ${_REFLECTION}
-    ${_GRPC_GRPCPP}
-    ${_PROTOBUF_LIBPROTOBUF}
-    rocksdb
-    hdfs)
-  target_include_directories(${_target} 
-    PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${HADOOP_HOME}/include)
-endforeach()
+# foreach(_target
+#   rdb_server)
+#   add_executable(${_target} "${_target}.cc")
+#   target_link_libraries(${_target}
+#     netservice
+#     absl::check
+#     absl::flags
+#     absl::flags_parse
+#     absl::log
+#     ${_REFLECTION}
+#     ${_GRPC_GRPCPP}
+#     ${_PROTOBUF_LIBPROTOBUF})
+# endforeach()
 
 # add_executable(rdb_client rdb_client.cc)

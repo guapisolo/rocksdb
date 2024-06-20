@@ -6,7 +6,7 @@
 #include "rocksdb/env.h"
 #include "rocksdb/options.h"
 
-#include "plugin/hdfs/env_hdfs.h"
+#include "env_hdfs.h"
 #include "hdfs.h"
 
 using ROCKSDB_NAMESPACE::DB;
@@ -23,7 +23,7 @@ int main() {
     DB *db;
 
     std::unique_ptr<rocksdb::Env> hdfs;
-    rocksdb::NewHdfsEnv("hdfs://10.218.106.144:9000/", &hdfs);
+    rocksdb::NewHdfsEnv("hdfs://localhost:9000/", &hdfs);
 
     Options options;
     options.env = hdfs.get();
@@ -36,6 +36,8 @@ int main() {
     // Open DB
     Status s = DB::Open(options, kDBPath, &db);
     std::cout << "Created table at " << kDBPath << "\n";
+    assert(s.ok());
+    printf("Opened db\n");
 
     // Write 1st pair
     s = db->Put(WriteOptions(), "game5", "apex");

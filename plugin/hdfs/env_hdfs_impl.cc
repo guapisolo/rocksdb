@@ -285,7 +285,6 @@ class HdfsWritableFile: public FSWritableFile {
                     filename_.c_str());
     this->opAwareFOpts = options;
     hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0);
-    // hfile_ = hdfsOpenFile(fileSys_, filename_.c_str(), O_WRONLY, 0, 0, 0, options.io_options.operation_name);
     ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile opened %s\n",
                     filename_.c_str());
     assert(hfile_ != nullptr);
@@ -294,6 +293,7 @@ class HdfsWritableFile: public FSWritableFile {
     if (hfile_ != nullptr) {
       ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile closing %s\n",
                       filename_.c_str());
+      // Failing here for some reason
       hdfsCloseFile(fileSys_, hfile_);
       ROCKS_LOG_DEBUG(mylog, "[hdfs] HdfsWritableFile closed %s\n",
                       filename_.c_str());

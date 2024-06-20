@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <string>
 
-#include "rdb_client.h"
+#include "plugin/netservice/rdb_client.h"
 
 int main() {
     std::string server_address = "0.0.0.0:50050";

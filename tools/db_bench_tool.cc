@@ -92,7 +92,7 @@
 #include "utilities/persistent_cache/block_cache_tier.h"
 
 #ifdef NETSERVICE
-#include "rdb_client.h"
+#include "plugin/netservice/rdb_client.h"
 #endif
 
 #ifdef MEMKIND

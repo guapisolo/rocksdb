@@ -1,4 +1,4 @@
-include ../make_config.mk
+include ../../../make_config.mk
 
 ifndef DISABLE_JEMALLOC
 	ifdef JEMALLOC
@@ -18,8 +18,8 @@ CFLAGS += -Wstrict-prototypes
 
 all: testhdfs
 
-testhdfs: librocksdb testhdfs.cc
-	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../librocksdb.a -I../include -I../plugin/hdfs -O2 -I${HADOOP_HOME}/include -L${HADOOP_HOME}/lib/native -lhdfs $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
+testhdfs: testhdfs.cc
+	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../../../librocksdb.a -I../../../include -I../../../plugin/hdfs -O2 -I${HADOOP_HOME}/include -L${HADOOP_HOME}/lib/native -lhdfs $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 
 clean:
 	rm -rf ./testhdfs
