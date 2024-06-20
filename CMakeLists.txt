@@ -152,13 +152,14 @@ else()
 
   option(WITH_NETSERVICE "build netservice library" ON)
   if (WITH_NETSERVICE)
+    # import requirements
+    # 1. Protobuf
     if(NOT DEFINED ENV{Protobuf_DIR})
-    set(Protobuf_DIR /data/viraj/projects/network-project/protobuf-3.7-src/)
+      set(Protobuf_DIR /data/viraj/projects/network-project/protobuf-3.7-src/)
     else()
-    set(Protobuf_DIR $ENV{Protobuf_DIR})
+      set(Protobuf_DIR $ENV{Protobuf_DIR})
     endif()
 
-    # Protobuf
     set(protobuf_MODULE_COMPATIBLE TRUE)
     find_package(Protobuf CONFIG REQUIRED PARENT_SCOPE)
     message(STATUS "Using protobuf ${protobuf_VERSION}")
@@ -166,12 +167,17 @@ else()
     set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
     set(_REFLECTION gRPC::grpc++_reflection)
 
-    # gRPC
+    # 2. gRPC
     find_package(gRPC CONFIG REQUIRED)
     message(STATUS "Using gRPC ${gRPC_VERSION}")
     set(_GRPC_GRPCPP gRPC::grpc++)
 
-    add_definitions(-DNETSERVICE=1)
+    # Build appropriate netservice library
+    add_subdirectory(netservice)
+    message(STATUS "Using netservice library")
+
+    list(APPEND THIRDPARTY_LIBS netservice)
+    add_definitions(-DNETSERVICE)
   endif()
 
   option(WITH_BZ2 "build with bzip2" OFF)
@@ -1610,6 +1616,14 @@ endif()
 option(WITH_EXAMPLES "build with examples" OFF)
 if(WITH_EXAMPLES)
   add_subdirectory(examples)
+endif()
+
+if (WITH_NETSERVICE)
+  # For rdb_server
+  add_executable(rdb_server plugin/netservice/rdb_server.cc)
+  target_link_libraries(rdb_server
+    ${ROCKSDB_LIB}
+    ${THIRDPARTY_LIBS})
 endif()
 
 option(WITH_BENCHMARK "build benchmark tests" OFF)

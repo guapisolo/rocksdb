@@ -20,7 +20,5 @@ find_package(gRPC CONFIG REQUIRED)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 set(_GRPC_GRPCPP gRPC::grpc++)
 
-set(netservice_SOURCES "rdb_client.cc" "rdb_server.cc" PARENT SCOPE)
+set(netservice_SOURCES "rdb_client.cc" PARENT SCOPE)
 set(netservice_LIBS "netservice" "dl" "verify" ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF} PARENT_SCOPE)
-set(netservice_INCLUDE_PATHS "$ENV{NETSERVICE_PATH}" "$ENV{NETSERVICE_PATH}/build" PARENT_SCOPE)
-set(netservice_LINK_PATHS "$ENV{NETSERVICE_PATH}/build" PARENT_SCOPE)

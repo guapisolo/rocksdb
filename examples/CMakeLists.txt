@@ -43,3 +43,11 @@ add_executable(multi_processes_example
   multi_processes_example.cc)
 target_link_libraries(multi_processes_example
   ${ROCKSDB_LIB})
+
+message(STATUS "THIRDPARTY_LIBS: ${THIRDPARTY_LIBS}")
+
+add_executable(simple_grpc_example
+  simple_grpc_example.cc)
+target_link_libraries(simple_grpc_example
+  ${ROCKSDB_LIB}
+  ${THIRDPARTY_LIBS})
