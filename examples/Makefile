@@ -8,9 +8,9 @@ ifndef DISABLE_JEMALLOC
 	PLATFORM_CXXFLAGS += $(JEMALLOC_INCLUDE)
 endif
 
-ifneq ($(USE_RTTI), 1)
-	CXXFLAGS += -fno-rtti
-endif
+# ifneq ($(USE_RTTI), 1)
+# 	CXXFLAGS += -fno-rtti
+# endif
 
 CFLAGS += -Wstrict-prototypes
 
@@ -51,8 +51,11 @@ multi_processes_example: librocksdb multi_processes_example.cc
 rocksdb_backup_restore_example: librocksdb rocksdb_backup_restore_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../librocksdb.a -I../include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 
+hdfstest: librocksdb hdfstest.cc
+	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../librocksdb.a -I../include -I../plugin/netservice -I../plugin/netservice/build -I/data/viraj/.local/grpc/include -I/data/viraj/.local/include -O2 -std=c++17 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS) -L../plugin/netservice/build -lns_grpc_proto -L/data/viraj/.local/lib -lprotobuf -L/data/viraj/.local/grpc/cmake/build -lgrpc++
+	
 clean:
-	rm -rf ./simple_example ./column_families_example ./compact_files_example ./compaction_filter_example ./c_simple_example c_simple_example.o ./optimistic_transaction_example ./transaction_example ./options_file_example ./multi_processes_example ./rocksdb_backup_restore_example
+	rm -rf ./simple_example ./column_families_example ./compact_files_example ./compaction_filter_example ./c_simple_example c_simple_example.o ./optimistic_transaction_example ./transaction_example ./options_file_example ./multi_processes_example ./rocksdb_backup_restore_example ./hdfstest
 
 librocksdb:
 	cd .. && $(MAKE) static_lib

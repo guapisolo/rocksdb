@@ -150,6 +150,30 @@ else()
     list(APPEND THIRDPARTY_LIBS ZLIB::ZLIB)
   endif()
 
+  option(WITH_NETSERVICE "build netservice library" ON)
+  if (WITH_NETSERVICE)
+    if(NOT DEFINED ENV{Protobuf_DIR})
+    set(Protobuf_DIR /data/viraj/projects/network-project/protobuf-3.7-src/)
+    else()
+    set(Protobuf_DIR $ENV{Protobuf_DIR})
+    endif()
+
+    # Protobuf
+    set(protobuf_MODULE_COMPATIBLE TRUE)
+    find_package(Protobuf CONFIG REQUIRED PARENT_SCOPE)
+    message(STATUS "Using protobuf ${protobuf_VERSION}")
+
+    set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
+    set(_REFLECTION gRPC::grpc++_reflection)
+
+    # gRPC
+    find_package(gRPC CONFIG REQUIRED)
+    message(STATUS "Using gRPC ${gRPC_VERSION}")
+    set(_GRPC_GRPCPP gRPC::grpc++)
+
+    add_definitions(-DNETSERVICE=1)
+  endif()
+
   option(WITH_BZ2 "build with bzip2" OFF)
   if(WITH_BZ2)
     find_package(BZip2 REQUIRED)

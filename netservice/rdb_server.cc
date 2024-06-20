@@ -8,8 +8,13 @@
 #include "netservice.grpc.pb.h"
 
 // RocksDB
-#include <rocksdb/db.h>
-#include <rocksdb/options.h>
+#include "rocksdb/cache.h"
+#include "rocksdb/compaction_filter.h"
+#include "rocksdb/db.h"
+#include "rocksdb/options.h"
+#include "rocksdb/slice.h"
+#include "rocksdb/table.h"
+#include "rocksdb/utilities/options_util.h"
 
 // UDP
 #include <bits/stdc++.h> 
@@ -30,15 +35,32 @@ using netservice::OperationRequest;
 using netservice::OperationResponse;
 using netservice::NetService;
 
+using ROCKSDB_NAMESPACE::BlockBasedTableOptions;
+using ROCKSDB_NAMESPACE::ColumnFamilyDescriptor;
+using ROCKSDB_NAMESPACE::ColumnFamilyHandle;
+using ROCKSDB_NAMESPACE::ColumnFamilyOptions;
+using ROCKSDB_NAMESPACE::CompactionFilter;
+using ROCKSDB_NAMESPACE::ConfigOptions;
+using ROCKSDB_NAMESPACE::DB;
+using ROCKSDB_NAMESPACE::DBOptions;
+using ROCKSDB_NAMESPACE::NewLRUCache;
+using ROCKSDB_NAMESPACE::Options;
+using ROCKSDB_NAMESPACE::Slice;
+
 // queue shared across multiple thread
 std::queue<std::string> optimizationQueue;
 
 class NetServiceImpl final : public NetService::Service {
 public:
     NetServiceImpl(const std::string& db_path) {
-        rocksdb::Options options;
+        Options options;
         options.create_if_missing = true;
-        rocksdb::Status status = rocksdb::DB::Open(options, db_path, &db_);
+        // Load options from a file
+        ConfigOptions config_options;
+        std::vector<ColumnFamilyDescriptor> cf_descs;
+
+        rocksdb::Status status = rocksdb::LoadOptionsFromFile(config_options, "../db_bench_options.ini", &options, &cf_descs);
+        status = DB::Open(options, db_path, &db_);
         if (!status.ok()) {
             std::cerr << "Error opening database: " << status.ToString() << std::endl;
             exit(1);
@@ -52,9 +74,24 @@ public:
     Status OperationService(ServerContext* context, const OperationRequest* request,
                              OperationResponse* response) override {
         // Maybe just implement a data structure here and have another piece of code that actually does the operation?
+        fprintf(stderr, "Operation: %d\n", request->operation());
         switch (request->operation()) {
             case OperationRequest::PUT: {
-                rocksdb::Status status = db_->Put(rocksdb::WriteOptions(), request->key(), request->value());
+                rocksdb::Status status = db_->Put(rocksdb::WriteOptions(), request->keys(0), request->values(0));
+                if (status.ok()) {
+                    response->set_result("OK");
+                } else {
+                    response->set_result(status.ToString());
+                }
+                break;
+            }
+            case OperationRequest::BatchPut: {
+                rocksdb::WriteBatch batch;
+                for (int i = 0; i < request->keys_size(); i++) {
+                    batch.Put(request->keys(i), request->values(i));
+                }
+                rocksdb::Status status = db_->Write(rocksdb::WriteOptions(), &batch);
+                printf("BatchPut status: %s\n", status.ToString().c_str());
                 if (status.ok()) {
                     response->set_result("OK");
                 } else {
@@ -64,7 +101,7 @@ public:
             }
             case OperationRequest::GET: {
                 std::string value;
-                rocksdb::Status status = db_->Get(rocksdb::ReadOptions(), request->key(), &value);
+                rocksdb::Status status = db_->Get(rocksdb::ReadOptions(), request->keys(0), &value);
                 if (status.ok()) {
                     response->set_result(value);
                 } else {
@@ -73,7 +110,7 @@ public:
                 break;
             }
             case OperationRequest::DELETE: {
-                rocksdb::Status status = db_->Delete(rocksdb::WriteOptions(), request->key());
+                rocksdb::Status status = db_->Delete(rocksdb::WriteOptions(), request->keys(0));
                 if (status.ok()) {
                     response->set_result("OK");
                 } else {
@@ -159,7 +196,6 @@ void RunOptimizationService() {
         }
     }
 }
-
 
 int main() {
     std::string server_address = "0.0.0.0:50050";

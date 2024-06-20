@@ -11,10 +11,11 @@ message OperationRequest {
     PUT = 0;
     GET = 1;
     DELETE = 2;
+    BatchPut = 3;
   }
   Operation operation = 1;
-  string key = 2;
-  string value = 3;
+  repeated string keys = 2;
+  repeated string values = 3;
 }
 
 message OperationResponse {

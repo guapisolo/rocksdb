@@ -91,6 +91,10 @@
 #include "utilities/merge_operators/sortlist.h"
 #include "utilities/persistent_cache/block_cache_tier.h"
 
+#ifdef NETSERVICE
+#include "rdb_client.h"
+#endif
+
 #ifdef MEMKIND
 #include "memory/memkind_kmem_allocator.h"
 #endif
@@ -1741,6 +1745,9 @@ DEFINE_bool(build_info, false,
 
 DEFINE_bool(track_and_verify_wals_in_manifest, false,
             "If true, enable WAL tracking in the MANIFEST");
+
+DEFINE_string(netservice_server_url, "0.0.0.0:50050",
+              "URL for the netservice server");
 
 namespace ROCKSDB_NAMESPACE {
 namespace {
@@ -4749,11 +4756,17 @@ class Benchmark {
   }
 
   void Open(Options* opts) {
-    if (!InitializeOptionsFromFile(opts)) {
-      InitializeOptionsFromFlags(opts);
-    }
-
-    InitializeOptionsGeneral(opts);
+    #ifdef NETSERVICE
+      std::string server_address = FLAGS_netservice_server_url;
+      fprintf(stdout, "--------------------------------------------------\n");
+      fprintf(stdout, "Netservice enabled. Default options are ignored\n");
+      fprintf(stdout, "Using Server at: %s\n", server_address.c_str());
+    #else
+      if (!InitializeOptionsFromFile(opts)) {
+        InitializeOptionsFromFlags(opts);
+      }
+    #endif
+      InitializeOptionsGeneral(opts);
   }
 
   void OpenDb(Options options, const std::string& db_name,
@@ -5125,6 +5138,8 @@ class Benchmark {
     size_t id = 0;
     int64_t num_range_deletions = 0;
 
+    NetClient client(grpc::CreateChannel(FLAGS_netservice_server_url, grpc::InsecureChannelCredentials()));
+
     while ((num_per_key_gen != 0) && !duration.Done(entries_per_batch_)) {
       if (duration.GetStage() != stage) {
         stage = duration.GetStage();
@@ -5283,7 +5298,12 @@ class Benchmark {
             s = blobdb->Put(write_options_, key, val);
           }
         } else if (FLAGS_num_column_families <= 1) {
+        #ifdef NETSERVICE 
+          // client.GetBatchData(key.ToString().c_str(), val.ToString().c_str());
+          client.OperationService("PUT", key.data(), val.data());
+        #else
           batch.Put(key, val);
+        #endif
         } else {
           // We use same rand_num as seed for key and column family so that we
           // can deterministically find the cfh corresponding to a particular
@@ -5354,6 +5374,7 @@ class Benchmark {
           }
         }
       }
+
       if (thread->shared->write_rate_limiter.get() != nullptr) {
         thread->shared->write_rate_limiter->Request(
             batch_bytes, Env::IO_HIGH, nullptr /* stats */,
@@ -5375,7 +5396,12 @@ class Benchmark {
       }
       if (!use_blob_db_) {
         // Not stacked BlobDB
-        s = db_with_cfh->db->Write(write_options_, &batch);
+        #ifdef NETSERVICE
+          // client.BatchPut(batch);
+          // client.OperationService("BatchPut", "k0", "v0");
+        #else
+          s = db_with_cfh->db->Write(write_options_, &batch);
+        #endif
       }
       thread->stats.FinishedOps(db_with_cfh, db_with_cfh->db,
                                 entries_per_batch_, kWrite);
@@ -6923,6 +6949,7 @@ class Benchmark {
       }
       if (write_merge == kWrite) {
         if (user_timestamp_size_ == 0) {
+          // Viraj
           s = db->Put(write_options_, key, val);
         } else {
           s = db->Put(write_options_, key, ts, val);
@@ -7280,7 +7307,7 @@ class Benchmark {
         if (user_timestamp_size_ > 0) {
           Slice ts = mock_app_clock_->Allocate(ts_guard.get());
           s = db->Put(write_options_, key, ts, gen.Generate());
-        } else {
+        } else { 
           s = db->Put(write_options_, key, gen.Generate());
         }
         if (!s.ok()) {
