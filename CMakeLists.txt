@@ -1621,6 +1621,7 @@ endif()
 if (WITH_NETSERVICE)
   # For rdb_server
   add_executable(rdb_server plugin/netservice/rdb_server.cc)
+  file(COPY plugin/netservice/dbbench_default_options.ini DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
   target_link_libraries(rdb_server
     ${ROCKSDB_LIB}
     ${THIRDPARTY_LIBS})
