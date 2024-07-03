@@ -161,7 +161,7 @@ else()
     endif()
 
     set(protobuf_MODULE_COMPATIBLE TRUE)
-    find_package(Protobuf CONFIG REQUIRED PARENT_SCOPE)
+    find_package(Protobuf CONFIG REQUIRED)
     message(STATUS "Using protobuf ${protobuf_VERSION}")
 
     set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
@@ -176,8 +176,8 @@ else()
     add_subdirectory(netservice)
     message(STATUS "Using netservice library")
 
-    list(APPEND THIRDPARTY_LIBS netservice)
     add_definitions(-DNETSERVICE)
+    list(APPEND THIRDPARTY_LIBS netservice)
   endif()
 
   option(WITH_BZ2 "build with bzip2" OFF)
@@ -1228,7 +1228,7 @@ if(NOT WIN32 OR ROCKSDB_INSTALL_ON_WINDOWS)
   install(DIRECTORY "${PROJECT_SOURCE_DIR}/cmake/modules" COMPONENT devel DESTINATION ${package_config_destination})
 
   install(
-    TARGETS ${ROCKSDB_STATIC_LIB}
+    TARGETS ${ROCKSDB_STATIC_LIB} netservice
     EXPORT RocksDBTargets
     COMPONENT devel
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

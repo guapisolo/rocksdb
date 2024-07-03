@@ -75,7 +75,10 @@ else()
   target_compile_options(netservice PRIVATE -Wall -Wextra -pedantic)
 endif()
 
-target_include_directories(netservice PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
+target_include_directories(netservice INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 # ------------------------------------------------------------------------------
 install(TARGETS netservice 
