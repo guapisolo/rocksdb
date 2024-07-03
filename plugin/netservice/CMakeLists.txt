@@ -7,6 +7,12 @@ else()
   set(Protobuf_DIR $ENV{Protobuf_DIR})
 endif()
 
+if(NOT DEFINED ENV{NETSERVICE_PATH})
+  set(NETSERVICE_PATH /data/viraj/projects/network-project/netservice/)
+else()
+  set(NETSERVICE_PATH $ENV{NETSERVICE_PATH})
+endif()
+
 # Protobuf
 set(protobuf_MODULE_COMPATIBLE TRUE)
 find_package(Protobuf CONFIG REQUIRED PARENT_SCOPE)
@@ -22,3 +28,5 @@ set(_GRPC_GRPCPP gRPC::grpc++)
 
 set(netservice_SOURCES "rdb_client.cc" PARENT SCOPE)
 set(netservice_LIBS "netservice" "dl" "verify" ${_REFLECTION} ${_GRPC_GRPCPP} ${_PROTOBUF_LIBPROTOBUF} PARENT_SCOPE)
+set(netservice_INCLUDE_PATHS ${NETSERVICE_PATH} PARENT_SCOPE)
+set(netservice_LINK_PATHS ${NETSERVICE_PATH} PARENT_SCOPE)
