@@ -76,7 +76,7 @@ public:
         // Maybe just implement a data structure here and have another piece of code that actually does the operation?
         fprintf(stderr, "Operation: %d\n", request->operation());
         switch (request->operation()) {
-            case OperationRequest::PUT: {
+            case OperationRequest::Put: {
                 rocksdb::Status status = db_->Put(rocksdb::WriteOptions(), request->keys(0), request->values(0));
                 if (status.ok()) {
                     response->set_result("OK");
@@ -99,7 +99,7 @@ public:
                 }
                 break;
             }
-            case OperationRequest::GET: {
+            case OperationRequest::Get: {
                 std::string value;
                 rocksdb::Status status = db_->Get(rocksdb::ReadOptions(), request->keys(0), &value);
                 if (status.ok()) {
@@ -109,7 +109,7 @@ public:
                 }
                 break;
             }
-            case OperationRequest::DELETE: {
+            case OperationRequest::Delete: {
                 rocksdb::Status status = db_->Delete(rocksdb::WriteOptions(), request->keys(0));
                 if (status.ok()) {
                     response->set_result("OK");

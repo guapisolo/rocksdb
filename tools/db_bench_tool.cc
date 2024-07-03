@@ -5300,7 +5300,7 @@ class Benchmark {
         } else if (FLAGS_num_column_families <= 1) {
         #ifdef NETSERVICE 
           // client.GetBatchData(key.ToString().c_str(), val.ToString().c_str());
-          client.OperationService("PUT", key.data(), val.data());
+          client.OperationService("Put", key.data(), val.data());
         #else
           batch.Put(key, val);
         #endif

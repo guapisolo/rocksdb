@@ -12,7 +12,7 @@ int main() {
     std::string server_address = "0.0.0.0:50050";
     
     // To be supplied by the benchmark
-    std::string operation = "PUT";
+    std::string operation = "Put";
     std::string key_prefix = "key";
     std::string value_prefix = "value";
 

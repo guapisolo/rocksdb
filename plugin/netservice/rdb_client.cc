@@ -10,12 +10,12 @@ std::string NetClient::GetBatchData(const std::string& key, const std::string& v
 }
 
 std::string NetClient::OperationService(const std::string& operation, const std::string& key, const std::string& value) {
-    if (operation == "PUT") {
-        request.set_operation(OperationRequest::PUT);
-    } else if (operation == "GET") {
-        request.set_operation(OperationRequest::GET);
-    } else if (operation == "DELETE") {
-        request.set_operation(OperationRequest::DELETE);
+    if (operation == "Put") {
+        request.set_operation(OperationRequest::Put);
+    } else if (operation == "Get") {
+        request.set_operation(OperationRequest::Get);
+    } else if (operation == "Delete") {
+        request.set_operation(OperationRequest::Delete);
     } else if (operation == "BatchPut") {
         request.set_operation(OperationRequest::BatchPut);
     } else {

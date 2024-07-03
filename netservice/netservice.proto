@@ -8,9 +8,9 @@ service NetService {
 
 message OperationRequest {
   enum Operation {
-    PUT = 0;
-    GET = 1;
-    DELETE = 2;
+    Put = 0;
+    Get = 1;
+    Delete = 2;
     BatchPut = 3;
   }
   Operation operation = 1;
