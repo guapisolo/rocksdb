@@ -16,6 +16,10 @@
 #include "rocksdb/table.h"
 #include "rocksdb/utilities/options_util.h"
 
+// HDFS + RocksDB-HDFS Plugin
+#include "env_hdfs.h"
+#include "hdfs.h"
+
 // UDP
 #include <bits/stdc++.h> 
 #include <stdlib.h> 
@@ -63,6 +67,12 @@ public:
         std::vector<ColumnFamilyDescriptor> cf_descs;
 
         rocksdb::Status status = rocksdb::LoadOptionsFromFile(config_options, "../db_bench_options.ini", &options, &cf_descs);
+
+        std::unique_ptr<rocksdb::Env> hdfs;
+        rocksdb::NewHdfsEnv("hdfs://localhost:9000/", &hdfs);
+
+        options.env = hdfs.get();
+
         status = DB::Open(options, db_path, &db_);
         if (!status.ok()) {
             std::cerr << "Error opening database: " << status.ToString() << std::endl;
