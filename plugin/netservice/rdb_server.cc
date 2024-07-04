@@ -17,7 +17,7 @@
 #include "rocksdb/utilities/options_util.h"
 
 // HDFS + RocksDB-HDFS Plugin
-#include "env_hdfs.h"
+#include "plugin/hdfs/env_hdfs.h"
 #include "hdfs.h"
 
 // UDP
@@ -137,7 +137,6 @@ public:
             }
         }
 
-        e:
         // This bit effectively is useless for now
         // stream->Write(response);
         fprintf(stderr, "Response: %s\n", response->result().c_str());

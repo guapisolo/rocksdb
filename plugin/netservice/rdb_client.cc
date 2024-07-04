@@ -32,8 +32,6 @@ bool NetClient::WriteToStream(const std::string& operation, const std::string& k
     request.add_keys(key);
     request.add_values(value);
 
-    fprintf(stderr, "Operation: %d\n", request.operation());
-
     return stream_writer_->Write(request);
 }
 
