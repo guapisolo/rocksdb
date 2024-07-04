@@ -5139,6 +5139,10 @@ class Benchmark {
     int64_t num_range_deletions = 0;
 
     NetClient client(grpc::CreateChannel(FLAGS_netservice_server_url, grpc::InsecureChannelCredentials()));
+    if (!client.StartStream()) {
+        std::cerr << "Failed to start stream" << std::endl;
+        exit(1);
+    }
 
     while ((num_per_key_gen != 0) && !duration.Done(entries_per_batch_)) {
       if (duration.GetStage() != stage) {
@@ -5299,8 +5303,7 @@ class Benchmark {
           }
         } else if (FLAGS_num_column_families <= 1) {
         #ifdef NETSERVICE 
-          // client.GetBatchData(key.ToString().c_str(), val.ToString().c_str());
-          client.OperationService("Put", key.data(), val.data());
+          client.WriteToStream("Put", key.data(), val.data());
         #else
           batch.Put(key, val);
         #endif

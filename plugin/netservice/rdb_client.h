@@ -18,6 +18,7 @@
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
+using grpc::ClientWriter;
 
 using netservice::OperationRequest;
 using netservice::OperationResponse;
@@ -28,9 +29,14 @@ class NetClient {
 public:
     NetClient(std::shared_ptr<Channel> channel);
 
-    std::string OperationService(const std::string& operation, const std::string& key, const std::string& value);
     std::string GetBatchData(const std::string& key, const std::string& value);
+    bool StartStream();
+    bool WriteToStream(const std::string& operation, const std::string& key, const std::string& value);
+    std::string FinishStream();
 
 private:
     std::unique_ptr<NetService::Stub> stub_;
+    ClientContext stream_context_;
+    std::unique_ptr<ClientWriter<OperationRequest>> stream_writer_;
+    OperationResponse stream_response_;
 };

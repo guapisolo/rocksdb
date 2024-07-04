@@ -30,6 +30,9 @@ using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
+using grpc::ServerReader;
+using grpc::ServerWriter;
+using grpc::ServerReaderWriter;
 
 using netservice::OperationRequest;
 using netservice::OperationResponse;
@@ -71,56 +74,63 @@ public:
         delete db_;
     }
 
-    Status OperationService(ServerContext* context, const OperationRequest* request,
-                             OperationResponse* response) override {
-        // Maybe just implement a data structure here and have another piece of code that actually does the operation?
-        fprintf(stderr, "Operation: %d\n", request->operation());
-        switch (request->operation()) {
-            case OperationRequest::Put: {
-                rocksdb::Status status = db_->Put(rocksdb::WriteOptions(), request->keys(0), request->values(0));
-                if (status.ok()) {
-                    response->set_result("OK");
-                } else {
-                    response->set_result(status.ToString());
+    Status OperationService(ServerContext* context,
+                            ServerReader<OperationRequest>* stream, OperationResponse* response) override {
+        OperationRequest request;
+
+        while (stream->Read(&request)) {
+            switch (request.operation()) {
+                case OperationRequest::Put: {
+                    rocksdb::Status status = db_->Put(rocksdb::WriteOptions(), request.keys(0), request.values(0));
+                    if (status.ok()) {
+                        response->set_result("OK");
+                    } else {
+                        response->set_result(status.ToString());
+                    }
+                    break;
                 }
-                break;
+                case OperationRequest::BatchPut: {
+                    rocksdb::WriteBatch batch;
+                    for (int i = 0; i < request.keys_size(); i++) {
+                        batch.Put(request.keys(i), request.values(i));
+                    }
+                    rocksdb::Status status = db_->Write(rocksdb::WriteOptions(), &batch);
+                    printf("BatchPut status: %s\n", status.ToString().c_str());
+                    if (status.ok()) {
+                        response->set_result("OK");
+                    } else {
+                        response->set_result(status.ToString());
+                    }
+                    break;
+                }
+                case OperationRequest::Get: {
+                    std::string value;
+                    rocksdb::Status status = db_->Get(rocksdb::ReadOptions(), request.keys(0), &value);
+                    if (status.ok()) {
+                        response->set_result(value);
+                    } else {
+                        response->set_result(status.ToString());
+                    }
+                    break;
+                }
+                case OperationRequest::Delete: {
+                    rocksdb::Status status = db_->Delete(rocksdb::WriteOptions(), request.keys(0));
+                    if (status.ok()) {
+                        response->set_result("OK");
+                    } else {
+                        response->set_result(status.ToString());
+                    }
+                    break;
+                }
+                default:
+                    response->set_result("Unknown operation");
             }
-            case OperationRequest::BatchPut: {
-                rocksdb::WriteBatch batch;
-                for (int i = 0; i < request->keys_size(); i++) {
-                    batch.Put(request->keys(i), request->values(i));
-                }
-                rocksdb::Status status = db_->Write(rocksdb::WriteOptions(), &batch);
-                printf("BatchPut status: %s\n", status.ToString().c_str());
-                if (status.ok()) {
-                    response->set_result("OK");
-                } else {
-                    response->set_result(status.ToString());
-                }
-                break;
-            }
-            case OperationRequest::Get: {
-                std::string value;
-                rocksdb::Status status = db_->Get(rocksdb::ReadOptions(), request->keys(0), &value);
-                if (status.ok()) {
-                    response->set_result(value);
-                } else {
-                    response->set_result(status.ToString());
-                }
-                break;
-            }
-            case OperationRequest::Delete: {
-                rocksdb::Status status = db_->Delete(rocksdb::WriteOptions(), request->keys(0));
-                if (status.ok()) {
-                    response->set_result("OK");
-                } else {
-                    response->set_result(status.ToString());
-                }
-                break;
-            }
-            default:
-                response->set_result("Unknown operation");
         }
+
+        e:
+        // This bit effectively is useless for now
+        // stream->Write(response);
+        fprintf(stderr, "Response: %s\n", response->result().c_str());
         return Status::OK;
     }
 

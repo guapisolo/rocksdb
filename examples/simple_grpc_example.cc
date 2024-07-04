@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <string>
+#include <iostream>
 
 #include "plugin/netservice/rdb_client.h"
 
@@ -16,18 +17,33 @@ int main() {
     std::string key_prefix = "key";
     std::string value_prefix = "value";
 
-    // Loop 1000000 times
+    // Create the NetClient instance once
+    NetClient client(grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+
+    // Start the streaming RPC
+    if (!client.StartStream()) {
+        std::cerr << "Failed to start stream" << std::endl;
+        return 1;
+    } else {
+        std::cout << "Stream started" << std::endl;
+    }
+
+    // Loop 1000000 times to send data
     for (int i = 0; i < 1000000; i++) {
         std::string key = key_prefix + std::to_string(i);
         std::string value = value_prefix + std::to_string(i);
 
-        NetClient client(grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
-
-        std::string result;
-        result = client.OperationService(operation, key, value);
-
-        std::cout << "Result: " << result << std::endl;
+        if (!client.WriteToStream(operation, key, value)) {
+            std::cerr << "Failed to write to stream" << std::endl;
+            break;
+        }
     }
+
+    // Finish the streaming RPC and get the result
+    std::string result = client.FinishStream();
+
+    // Print the result
+    std::cout << "Result: " << result << std::endl;
 
     return 0;
 }

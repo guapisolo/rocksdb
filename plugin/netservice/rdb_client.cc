@@ -9,7 +9,14 @@ std::string NetClient::GetBatchData(const std::string& key, const std::string& v
     return "OK";
 }
 
-std::string NetClient::OperationService(const std::string& operation, const std::string& key, const std::string& value) {
+bool NetClient::StartStream() {
+    stream_writer_ = stub_->OperationService(&stream_context_, &stream_response_);
+    return stream_writer_ != nullptr;
+}
+
+bool NetClient::WriteToStream(const std::string& operation, const std::string& key, const std::string& value) {
+    if (!stream_writer_) return false;
+
     if (operation == "Put") {
         request.set_operation(OperationRequest::Put);
     } else if (operation == "Get") {
@@ -22,18 +29,22 @@ std::string NetClient::OperationService(const std::string& operation, const std:
         return "Invalid operation";
     }
 
-    if (operation != "BatchPut") {
-        request.add_keys(key);
-        request.add_values(value);
-    }
+    request.add_keys(key);
+    request.add_values(value);
 
-    OperationResponse response;
-    ClientContext context;
+    fprintf(stderr, "Operation: %d\n", request.operation());
 
-    Status status = stub_->OperationService(&context, request, &response);
+    return stream_writer_->Write(request);
+}
+
+std::string NetClient::FinishStream() {
+    if (!stream_writer_) return "Stream not started";
+
+    stream_writer_->WritesDone();
+    Status status = stream_writer_->Finish();
 
     if (status.ok()) {
-        return response.result();
+        return stream_response_.result();
     } else {
         return "RPC failed";
     }
