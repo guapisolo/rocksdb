@@ -30,6 +30,7 @@ rocksdb.pc
 CMakeCache.txt
 CMakeFiles/
 build/
+\?/*
 
 ldb
 manifest_dump
@@ -100,5 +101,6 @@ third-party/folly/
 
 # Ignore the output folder 
 output_db/*
-outfiles/*
-!outfiles/outfile.py
+*.tsv
+*.txt
+*.pyc
