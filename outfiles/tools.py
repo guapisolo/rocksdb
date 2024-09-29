@@ -3,6 +3,7 @@ import re
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import interpolate as itp
 
 def decode_log(log_content):
 	# 提取所有数字
@@ -41,23 +42,28 @@ def decode_log(log_content):
 
 	return slow_write, slow_read, fast_write, fast_read, status, running_mig, scheduled_mig
 
-def decode_tsv(file_name):
+def decode_tsv(file_name, threads):
 	# Read data from file
-	file_path = file_name + '.tsv'
+	file_path = 'tsvs/' + file_name + '.tsv'
 	with open(file_path, 'r') as file:
 		data = file.read()
 
 	# Split the TSV data into lines and extract relevant information
 	lines = data.strip().split('\n')
-	ops_per_second = []
+	tsv_result = [[] for i in range(threads)]
 	dump_timestamps = []
-	
+
+	total = 0
+	# test_start_time = int(lines[0].split("\t")[2])
 	for line in lines:
 		parts = line.split("\t")
 		if parts[3] == 'write':
 			test_start_time = int(line.split("\t")[1])
 			break
-	
+
+	tsv_timestamp = [0 for i in range(threads)]
+	tsv_sumop = [0 for i in range(threads)]
+
 	for line in lines[1:]:
 		parts = line.split("\t")
 
@@ -68,13 +74,31 @@ def decode_tsv(file_name):
 			end_time = int(parts[2]) - test_start_time
 			ops_per_sec = float(parts[5])
 
-			ops_per_second.append(((end_time)/1000000, ops_per_sec))
+			flag = False
+			for i in range(threads):
+				if tsv_timestamp[i] == 0 or tsv_timestamp[i] == start_time:
+					tsv_sumop[i] += ops_per_sec * (end_time - tsv_timestamp[i]) / 1000000
+					tsv_timestamp[i] = end_time
+					tsv_result[i].append((tsv_timestamp[i] / 1000000, tsv_sumop[i]))
+					flag = True
+					break
+			assert flag, "Error: fail in decode_tsv()!"
 		
 		elif parts[1] == 'Dump':
 			dump_timestamp = int(parts[2]) - test_start_time
-			dump_timestamps.append(dump_timestamp/1000000)
+			dump_timestamps.append(dump_timestamp / 1000000)
 	
-	return ops_per_second, dump_timestamps
+	print(tsv_sumop)
+	default_interval = 1
+	ops_timestamps, ops_sum = itp.work(tsv_result, default_interval)
+	ops_per_sec = np.diff(ops_sum, prepend=0) / default_interval
+
+	total = ops_per_sec[0] * ops_timestamps[0]
+	for i in range(1, len(ops_per_sec)):
+		total += ops_per_sec[i] * (ops_timestamps[i] - ops_timestamps[i - 1])
+	print(total)
+
+	return ops_timestamps, ops_per_sec, dump_timestamps
 
 def array_avg(input, num):
 	ret = np.array(input)
@@ -83,11 +107,7 @@ def array_avg(input, num):
 	ret = ret.reshape(-1, num).mean(axis=1)
 	return ret
 
-def draw_graph(slow_write, slow_read, fast_write, fast_read, status, running_mig, scheduled_mig, dump_timestamps, ops_info, num1 = 0, num2 = 0):
-
-	ops_timestamps, ops_per_second = zip(*ops_info)
-	print(len(ops_timestamps))
-	print(len(dump_timestamps))
+def draw_graph(slow_write, slow_read, fast_write, fast_read, status, running_mig, scheduled_mig, dump_timestamps, ops_per_sec, ops_timestamps, num1 = 0, num2 = 0):
 
 	if num1 != 0:
 		slow_write = array_avg(slow_write, num1)
@@ -99,7 +119,7 @@ def draw_graph(slow_write, slow_read, fast_write, fast_read, status, running_mig
 
 	if num2 != 0:
 		ops_timestamps = array_avg(ops_timestamps, num2)
-		ops_per_second = array_avg(ops_per_second, num2)
+		ops_per_sec = array_avg(ops_per_sec, num2)
 
 	# 绘制折线图
 	fig, ax1 = plt.subplots()
@@ -130,7 +150,7 @@ def draw_graph(slow_write, slow_read, fast_write, fast_read, status, running_mig
 	ax4 = ax1.twinx()
 	ax4.tick_params(axis='y', labelcolor='tab:red')
 	ax4.set_ylim(bottom=0, top=10000)
-	ax4.plot(ops_timestamps, ops_per_second, color='tab:red')
+	ax4.plot(ops_timestamps, ops_per_sec, color='tab:red')
 	ax4.set_ylabel('Operations per Second', color='tab:red')
 
 	plt.xlabel('Time')
