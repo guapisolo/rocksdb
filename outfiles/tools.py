@@ -7,40 +7,29 @@ import interpolate as itp
 
 def decode_log(log_content):
 	# 提取所有数字
-	slow_pattern = r'Slowtier IO: (\d+\.\d+) GB write, (\d+\.\d+) MB/s write, (\d+\.\d+) GB read, (\d+\.\d+) MB/s read'
-	matches = re.findall(slow_pattern, log_content)
-	slow_write = [float(match[1]) for match in matches]
-	slow_write = slow_write[1:]
-	slow_read = [float(match[3]) for match in matches]
-	slow_read = slow_read[1:]
-	print("slow_write = {}".format(slow_write))
-	print("slow_read = {}".format(slow_read))
+	c_pattern = r'Interval compaction: (\d+\.\d+) GB write, (\d+\.\d+) MB/s write, (\d+\.\d+) GB read, (\d+\.\d+) MB/s read, (\d+\.\d+) seconds'
+	matches = re.findall(c_pattern, log_content)
+	c_write = [float(match[1]) for match in matches][1:]
+	c_read = [float(match[3]) for match in matches][1:]
+	print("c_write = {}".format(c_write))
+	print("c_read = {}".format(c_read))
 
-	fast_pattern = r'Fasttier IO: (\d+\.\d+) GB write, (\d+\.\d+) MB/s write, (\d+\.\d+) GB read, (\d+\.\d+) MB/s read'
-	matches = re.findall(fast_pattern, log_content)
-	fast_write = [float(match[1]) for match in matches]
-	fast_write = fast_write[1:]
-	fast_read = [float(match[3]) for match in matches]
-	fast_read = fast_read[1:]
-	print("fast_write = {}".format(fast_write))
-	print("fast_read = {}".format(fast_read))
+	wal_pattern = r'Interval WAL: (\d+[\w]*) writes, (\d+) syncs, (\d+\.\d+) writes per sync, written: (\d+\.\d+) GB, (\d+\.\d+) MB/s'
+	wal_matches = re.findall(wal_pattern, log_content)
+	wal_write = [float(match[4]) for match in wal_matches][1:]
+	print("wal_write = {}".format(wal_write))
+ 
+	total_write = np.add(c_write, wal_write)
+	total_write = [round(x, 3) for x in total_write]
+	print("total_write = {}".format(total_write))
 
-	status_p = r'FastTierStatus: (\d+\.\d+)%'
-	matches = re.findall(status_p, log_content)
-	status = [float(match) for match in matches]
-	status = status[1:]
-	print("status = {}".format(status))
-
-	rm_p = r'Migration Status: Running (\d+), Scheduled (\d+)'
-	matches = re.findall(rm_p, log_content)
-	running_mig = [int(match[0]) for match in matches]
-	running_mig = running_mig[1:]
-	scheduled_mig = [int(match[1]) for match in matches]
-	scheduled_mig = scheduled_mig[1:]
-	print("running_mig = {}".format(running_mig))
-	print("scheduled_mig = {}".format(scheduled_mig))
-
-	return slow_write, slow_read, fast_write, fast_read, status, running_mig, scheduled_mig
+	return {
+		'slow_write': total_write,
+		'slow_read': c_read,
+		'compaction_write': c_write,
+		'compaction_read': c_read,
+		'wal_write': wal_write
+	}
 
 def decode_tsv(file_name, threads):
 	# Read data from file
@@ -98,7 +87,11 @@ def decode_tsv(file_name, threads):
 		total += ops_per_sec[i] * (ops_timestamps[i] - ops_timestamps[i - 1])
 	print(total)
 
-	return ops_timestamps, ops_per_sec, dump_timestamps
+	return {
+		'ops_per_sec': ops_per_sec,
+		'ops_timestamps': ops_timestamps,
+		'dump_timestamps': dump_timestamps
+	}
 
 def array_avg(input, num):
 	ret = np.array(input)
@@ -107,11 +100,11 @@ def array_avg(input, num):
 	ret = ret.reshape(-1, num).mean(axis=1)
 	return ret
 
-def draw_graph(slow_write, slow_read, fast_write, fast_read, status, running_mig, scheduled_mig, dump_timestamps, ops_per_sec, ops_timestamps, num1 = 0, num2 = 0):
+def draw_graph(c_write, c_read, fast_write, fast_read, status, running_mig, scheduled_mig, dump_timestamps, ops_per_sec, ops_timestamps, num1 = 0, num2 = 0):
 
 	if num1 != 0:
-		slow_write = array_avg(slow_write, num1)
-		slow_read = array_avg(slow_read, num1)
+		c_write = array_avg(c_write, num1)
+		c_read = array_avg(c_read, num1)
 		fast_write = array_avg(fast_write, num1)
 		fast_read = array_avg(fast_read, num1)
 		status = array_avg(status, num1)
@@ -128,8 +121,8 @@ def draw_graph(slow_write, slow_read, fast_write, fast_read, status, running_mig
 	ax1.tick_params(axis='y', labelcolor='tab:blue')
 	ax1.set_ylim(bottom=0, top=1000)
 	ax1.set_ylabel('Tier IO Speed (MB/s)', color='tab:blue')
-	ax1.plot(dump_timestamps, slow_write, label="SlowTier Write", color='tab:blue')
-	ax1.plot(dump_timestamps, slow_read, label="SlowTier Read", color='tab:orange')
+	ax1.plot(dump_timestamps, c_write, label="SlowTier Write", color='tab:blue')
+	ax1.plot(dump_timestamps, c_read, label="SlowTier Read", color='tab:orange')
 	ax1.plot(dump_timestamps, fast_write, label="FastTier Write", color='tab:green')
 	ax1.plot(dump_timestamps, fast_read, label="FastTier Read", color='tab:pink')
 	ax1.legend()

@@ -7,23 +7,33 @@ import os
 from datetime import datetime
 
 def copy_and_rename_log_file(src_file_path, dest_folder):
-    current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    new_file_name = f"{current_time_str}.log"
-    if not os.path.exists(dest_folder):
-        os.makedirs(dest_folder)
-    dest_file_path = os.path.join(dest_folder, new_file_name)
-    shutil.copy(src_file_path, dest_file_path)
-    print(f"copy success!: {dest_file_path}")
+	current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+	new_file_name = f"{current_time_str}.log"
+	if not os.path.exists(dest_folder):
+		os.makedirs(dest_folder)
+	dest_file_path = os.path.join(dest_folder, new_file_name)
+	shutil.copy(src_file_path, dest_file_path)
+	print(f"copy success!: {dest_file_path}")
 
 def saveLogAndOutput(cmd, filename, threads):
-#   source_log_file = "/data/jiajun/disk/LOG"  # 源 log 文件路径
-#   destination_folder = "/data/jiajun/logs"  # 目标文件夹路径
-#   copy_and_rename_log_file(source_log_file, destination_folder)
-  ops_timestamps, ops_per_sec, dump_timestamps  = g.decode_tsv(filename, threads)
-  with open('txts/' + filename + '.txt', 'w+') as f:
-    f.write(f'ops_per_sec = {list(ops_per_sec)}\n')
-    f.write(f'ops_timestamps = {ops_timestamps}\n') 
-    f.write(f'\n')
+	source_log_file = "/data/jiajun/disk/LOG"  # 源 log 文件路径
+	destination_folder = "/data/jiajun/logs"  # 目标文件夹路径
+	copy_and_rename_log_file(source_log_file, destination_folder)
+	with open('/data/jiajun/logs/2024-10-03T13:07:14.log', 'r') as file:
+	# with open('/data/jiajun/disk/LOG', 'r') as file:
+		log_content = file.read()
+	log = g.decode_log(log_content)
+	tsv  = g.decode_tsv(filename, threads)
+	with open('txts/' + filename + '.txt', 'w+') as f:
+		f.write(f'slow_write = {log["slow_write"]}\n')
+		f.write(f'slow_read = {list(log["slow_read"])}\n')
+		f.write(f'compaction_write = {list(log["compaction_write"])}\n')
+		f.write(f'compaction_read = {list(log["compaction_read"])}\n')
+		f.write(f'wal_write = {list(log["wal_write"])}\n')
+		f.write(f'ops_per_sec = {list(tsv["ops_per_sec"])}\n')
+		f.write(f'ops_timestamps = {list(tsv["ops_timestamps"])}\n') 
+		f.write(f'dump_timestamps = {list(tsv["dump_timestamps"])}\n') 
+		f.write(f'\n')
 
 def runCmd(cmd, filename, threads):
   clear = 'rm /data/jiajun/disk/* -f'
@@ -39,13 +49,26 @@ def runJob(threads, p, onum, multiplier, bg_threads=4):
 	filename = f'slow{threads}threads{p}scale{onum}total{multiplier}multiplier{bg_threads}bg'
 	runCmd(cmd, filename, threads)
 
-onum = 500000000
-runJob(threads=16, p=0.25, onum=onum, multiplier=4, bg_threads=4)
-runJob(threads=16, p=0.25, onum=onum, multiplier=4, bg_threads=8)
+# with open('/data/jiajun/logs/2024-10-03T13:07:14.log', 'r') as file:
+# 	log_content = file.read()
+# g.decode_log(log_content)
+
+# onum = 10000000
+# runJob(threads=16, p=1, onum=onum, multiplier=4, bg_threads=4)
 
 onum = 500000000
-runJob(threads=16, p=1, onum=onum, multiplier=4, bg_threads=4)
-runJob(threads=16, p=1, onum=onum, multiplier=4, bg_threads=8)
+# runJob(threads=16, p=0.25, onum=onum, multiplier=4, bg_threads=3)
+runJob(threads=16, p=0.5, onum=onum, multiplier=4, bg_threads=3)
+
+# onum = 300000000
+# runJob(threads=16, p=1, onum=onum, multiplier=4, bg_threads=3)
+# runJob(threads=16, p=0.25, onum=onum, multiplier=4, bg_threads=8)
+# runJob(threads=16, p=0.25, onum=onum, multiplier=4, bg_threads=4)
+# runJob(threads=16, p=0.25, onum=onum, multiplier=4, bg_threads=8)
+
+# onum = 500000000
+# runJob(threads=16, p=1, onum=onum, multiplier=4, bg_threads=4)
+# runJob(threads=16, p=1, onum=onum, multiplier=4, bg_threads=8)
 
 # p = 1
 # onum = 500000000
