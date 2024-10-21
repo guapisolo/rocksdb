@@ -1109,6 +1109,9 @@ void DBImpl::DumpStats() {
   TEST_SYNC_POINT("DBImpl::DumpStats:2");
   ROCKS_LOG_INFO(immutable_db_options_.info_log,
                  "------- DUMPING STATS -------");
+  fprintf(stderr, "%s\tDump\t%" PRIu64 "\t\t\t\n",
+          TimeToStringMicros(GetSystemClock()->NowMicros()).c_str(),
+          GetSystemClock()->NowMicros());
   ROCKS_LOG_INFO(immutable_db_options_.info_log, "%s", stats.c_str());
   if (immutable_db_options_.dump_malloc_stats) {
     stats.clear();

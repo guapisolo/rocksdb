@@ -24,8 +24,8 @@ def decode_log(log_content):
 	print("total_write = {}".format(total_write))
 
 	return {
-		'slow_write': total_write,
-		'slow_read': c_read,
+		'disk_write': total_write,
+		'disk_read': c_read,
 		'compaction_write': c_write,
 		'compaction_read': c_read,
 		'wal_write': wal_write
@@ -88,7 +88,7 @@ def decode_tsv(file_name, threads):
 	print(total)
 
 	return {
-		'ops_per_sec': ops_per_sec,
+		'ops_per_sec': list(ops_per_sec),
 		'ops_timestamps': ops_timestamps,
 		'dump_timestamps': dump_timestamps
 	}
