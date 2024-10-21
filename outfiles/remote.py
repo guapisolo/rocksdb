@@ -30,6 +30,8 @@ def saveLogAndOutput(cmd, filename, threads):
 		f.write(f'disk_read = {log["disk_read"]}\n')
 		f.write(f'compaction_write = {log["compaction_write"]}\n')
 		f.write(f'compaction_read = {log["compaction_read"]}\n')
+		f.write(f'compaction_level_write = {log["compaction_level_write"]}\n')
+		f.write(f'compaction_level_read = {log["compaction_level_read"]}\n')
 		f.write(f'wal_write = {log["wal_write"]}\n')
 		f.write(f'ops_per_sec = {tsv["ops_per_sec"]}\n')
 		f.write(f'ops_timestamps = {tsv["ops_timestamps"]}\n') 
@@ -56,7 +58,7 @@ def runJob(threads, p, onum, multiplier, bg_threads, block_size=4, file_number=0
 # 	log_content = file.read()
 # g.decode_log(log_content)
 
-onum = 1000000000
+onum = 10000000
 # for i in [64, 4]:
 # 	runJob(threads=16, p=0.5, onum=onum, bg_threads=3, block_size=i, file_number=1, multiplier=4, file=256, level=256, cr=1, buf=64, cif="true", extra_op="")
 # 	runJob(threads=16, p=0.5, onum=onum, bg_threads=3, block_size=i, file_number=1, multiplier=4, file=64, level=256, cr=1, buf=64, cif="true", extra_op="")
@@ -74,10 +76,10 @@ onum = 1000000000
 # 	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
 
 for i in [32]:
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=32, cif="true", extra_op="")
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=32, cif="true", extra_op="")
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=32, cif="true", extra_op="")
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=32, cif="true", extra_op="")
+	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
 
 # onum = 2000000000
 # for i in [64, 4]:

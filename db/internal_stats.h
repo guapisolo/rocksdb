@@ -432,7 +432,7 @@ class InternalStats {
     explicit CompactionStatsFull() : stats(), penultimate_level_stats() {}
 
     explicit CompactionStatsFull(CompactionReason reason, int c)
-        : stats(reason, c), penultimate_level_stats(reason, c){};
+        : stats(reason, c), penultimate_level_stats(reason, c) {};
 
     uint64_t TotalBytesWritten() const {
       uint64_t bytes_written = stats.bytes_written + stats.bytes_written_blob;
@@ -684,6 +684,9 @@ class InternalStats {
     uint64_t ingest_files_addfile;     // Total number of files ingested
     uint64_t ingest_l0_files_addfile;  // Total number of files ingested to L0
     uint64_t ingest_keys_addfile;      // Total number of keys ingested
+    std::vector<uint64_t> compact_bytes_write_level;
+    std::vector<uint64_t> compact_bytes_read_level;
+    std::vector<uint64_t> compact_micros_level;
 
     CFStatsSnapshot()
         : ingest_bytes_flush(0),
@@ -695,7 +698,11 @@ class InternalStats {
           ingest_bytes_addfile(0),
           ingest_files_addfile(0),
           ingest_l0_files_addfile(0),
-          ingest_keys_addfile(0) {}
+          ingest_keys_addfile(0) {
+      compact_bytes_write_level.resize(7);
+      compact_bytes_read_level.resize(7);
+      compact_micros_level.resize(7);
+    }
 
     void Clear() {
       comp_stats.Clear();
@@ -709,6 +716,9 @@ class InternalStats {
       ingest_files_addfile = 0;
       ingest_l0_files_addfile = 0;
       ingest_keys_addfile = 0;
+      compact_bytes_write_level.clear();
+      compact_bytes_read_level.clear();
+      compact_micros_level.clear();
     }
   } cf_stats_snapshot_;
 
@@ -872,6 +882,5 @@ class InternalStats {
   ColumnFamilyData* cfd_;
   uint64_t started_at_;
 };
-
 
 }  // namespace ROCKSDB_NAMESPACE

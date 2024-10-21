@@ -33,7 +33,6 @@
 
 namespace ROCKSDB_NAMESPACE {
 
-
 const std::map<LevelStatType, LevelStat> InternalStats::compaction_level_stats =
     {
         {LevelStatType::NUM_FILES, LevelStat{"NumFiles", "Files"}},
@@ -2030,13 +2029,21 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
   uint64_t compact_bytes_read = 0;
   uint64_t compact_bytes_write = 0;
   uint64_t compact_micros = 0;
+  std::vector<uint64_t> compact_bytes_read_level;
+  std::vector<uint64_t> compact_bytes_write_level;
+  std::vector<uint64_t> compact_micros_level;
   for (int level = 0; level < number_levels_; level++) {
-    compact_bytes_read += comp_stats_[level].bytes_read_output_level +
-                          comp_stats_[level].bytes_read_non_output_levels +
-                          comp_stats_[level].bytes_read_blob;
-    compact_bytes_write += comp_stats_[level].bytes_written +
-                           comp_stats_[level].bytes_written_blob;
+    uint64_t r = comp_stats_[level].bytes_read_output_level +
+                 comp_stats_[level].bytes_read_non_output_levels +
+                 comp_stats_[level].bytes_read_blob;
+    compact_bytes_read += r;
+    compact_bytes_read_level.push_back(r);
+    uint64_t w = comp_stats_[level].bytes_written +
+                 comp_stats_[level].bytes_written_blob;
+    compact_bytes_write += w;
+    compact_bytes_write_level.push_back(w);
     compact_micros += comp_stats_[level].micros;
+    compact_micros_level.push_back(comp_stats_[level].micros);
   }
 
   snprintf(buf, sizeof(buf),
@@ -2067,6 +2074,71 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
       interval_compact_bytes_read / kMB / std::max(interval_seconds_up, 0.001),
       interval_compact_micros / kMicrosInSec);
   value->append(buf);
+  // compaction interval by level
+  snprintf(buf, sizeof(buf), "Compaction level: ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ", compact_bytes_write_level[l] / kGB),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] GB write, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ",
+             compact_bytes_write_level[l] / kMB / std::max(seconds_up, 0.001)),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] MB/s write, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ", compact_bytes_read_level[l] / kGB),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] GB read, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ",
+             compact_bytes_read_level[l] / kMB / std::max(seconds_up, 0.001)),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] MB/s read, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.1f, ",
+             compact_micros_level[l] / kMicrosInSec),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] seconds\n"), value->append(buf);
+  value->append(buf);
+  // interval compaction by level
+  snprintf(buf, sizeof(buf), "Interval compaction level: ["),
+      value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ",
+             (compact_bytes_write_level[l] -
+              cf_stats_snapshot_.compact_bytes_write_level[l]) /
+                 kGB),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] GB write, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ",
+             (compact_bytes_write_level[l] -
+              cf_stats_snapshot_.compact_bytes_write_level[l]) /
+                 kMB / std::max(interval_seconds_up, 0.001)),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] MB/s write, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ",
+             (compact_bytes_read_level[l] -
+              cf_stats_snapshot_.compact_bytes_read_level[l]) /
+                 kGB),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] GB read, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(buf, sizeof(buf), "%.2f, ",
+             (compact_bytes_read_level[l] -
+              cf_stats_snapshot_.compact_bytes_read_level[l]) /
+                 kMB / std::max(interval_seconds_up, 0.001)),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] MB/s read, ["), value->append(buf);
+  for (int l = 0; l < number_levels_; l++)
+    snprintf(
+        buf, sizeof(buf), "%.1f, ",
+        (compact_micros_level[l] - cf_stats_snapshot_.compact_micros_level[l]) /
+            kMicrosInSec),
+        value->append(buf);
+  snprintf(buf, sizeof(buf), "] seconds\n"), value->append(buf);
+
   if (is_periodic) {
     cf_stats_snapshot_.compact_bytes_write = compact_bytes_write;
     cf_stats_snapshot_.compact_bytes_read = compact_bytes_read;
@@ -2087,6 +2159,9 @@ void InternalStats::DumpCFStatsNoFileHistogram(bool is_periodic,
     cf_stats_snapshot_.ingest_keys_addfile = ingest_keys_addfile;
     cf_stats_snapshot_.comp_stats = compaction_stats_sum;
     cf_stats_snapshot_.stall_count = total_stall_count;
+    cf_stats_snapshot_.compact_bytes_write_level = compact_bytes_write_level;
+    cf_stats_snapshot_.compact_bytes_read_level = compact_bytes_read_level;
+    cf_stats_snapshot_.compact_micros_level = compact_micros_level;
   }
 
   // Do not gather cache entry stats during CFStats because DB
@@ -2128,6 +2203,5 @@ void InternalStats::DumpCFFileHistogram(std::string* value) {
 
   value->append(oss.str());
 }
-
 
 }  // namespace ROCKSDB_NAMESPACE

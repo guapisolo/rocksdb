@@ -6,13 +6,17 @@ import matplotlib.pyplot as plt
 import interpolate as itp
 
 def decode_log(log_content):
-	# 提取所有数字
 	c_pattern = r'Interval compaction: (\d+\.\d+) GB write, (\d+\.\d+) MB/s write, (\d+\.\d+) GB read, (\d+\.\d+) MB/s read, (\d+\.\d+) seconds'
 	matches = re.findall(c_pattern, log_content)
 	c_write = [float(match[1]) for match in matches][1:]
 	c_read = [float(match[3]) for match in matches][1:]
 	print("c_write = {}".format(c_write))
 	print("c_read = {}".format(c_read))
+
+	compaction_level_pattern = r'Interval compaction level: \[(\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), \] GB write, \[(\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), \] MB/s write, \[(\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), \] GB read, \[(\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+), \] MB/s read'
+	matches = re.findall(compaction_level_pattern, log_content)
+	compaction_level_write = [ [float(match[i + 7]) for match in matches][1:] for i in range(0, 7) ]
+	compaction_level_read = [ [float(match[i + 21]) for match in matches][1:] for i in range(0, 7) ]
 
 	wal_pattern = r'Interval WAL: (\d+[\w]*) writes, (\d+) syncs, (\d+\.\d+) writes per sync, written: (\d+\.\d+) GB, (\d+\.\d+) MB/s'
 	wal_matches = re.findall(wal_pattern, log_content)
@@ -28,6 +32,8 @@ def decode_log(log_content):
 		'disk_read': c_read,
 		'compaction_write': c_write,
 		'compaction_read': c_read,
+		'compaction_level_write': compaction_level_write,
+		'compaction_level_read': compaction_level_read,
 		'wal_write': wal_write
 	}
 
