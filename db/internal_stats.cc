@@ -1068,30 +1068,30 @@ bool InternalStats::HandleCFStats(std::string* value, Slice /*suffix*/) {
 
 bool InternalStats::HandleCFStatsPeriodic(std::string* value,
                                           Slice /*suffix*/) {
-  bool has_change = has_cf_change_since_dump_;
-  if (!has_change) {
-    // If file histogram changes, there is activity in this period too.
-    uint64_t new_histogram_num = 0;
-    for (int level = 0; level < number_levels_; level++) {
-      new_histogram_num += file_read_latency_[level].num();
-    }
-    new_histogram_num += blob_file_read_latency_.num();
-    if (new_histogram_num != last_histogram_num) {
-      has_change = true;
-      last_histogram_num = new_histogram_num;
-    }
-  }
-  if (has_change) {
-    no_cf_change_period_since_dump_ = 0;
-    has_cf_change_since_dump_ = false;
-  } else if (no_cf_change_period_since_dump_++ > 0) {
-    // Not ready to sync
-    if (no_cf_change_period_since_dump_ == kMaxNoChangePeriodSinceDump) {
-      // Next periodic, we need to dump stats even if there is no change.
-      no_cf_change_period_since_dump_ = 0;
-    }
-    return true;
-  }
+  // bool has_change = has_cf_change_since_dump_;
+  // if (!has_change) {
+  //   // If file histogram changes, there is activity in this period too.
+  //   uint64_t new_histogram_num = 0;
+  //   for (int level = 0; level < number_levels_; level++) {
+  //     new_histogram_num += file_read_latency_[level].num();
+  //   }
+  //   new_histogram_num += blob_file_read_latency_.num();
+  //   if (new_histogram_num != last_histogram_num) {
+  //     has_change = true;
+  //     last_histogram_num = new_histogram_num;
+  //   }
+  // }
+  // if (has_change) {
+  //   no_cf_change_period_since_dump_ = 0;
+  //   has_cf_change_since_dump_ = false;
+  // } else if (no_cf_change_period_since_dump_++ > 0) {
+  //   // Not ready to sync
+  //   if (no_cf_change_period_since_dump_ == kMaxNoChangePeriodSinceDump) {
+  //     // Next periodic, we need to dump stats even if there is no change.
+  //     no_cf_change_period_since_dump_ = 0;
+  //   }
+  //   return true;
+  // }
 
   DumpCFStatsNoFileHistogram(/*is_periodic=*/true, value);
   DumpCFFileHistogram(value);

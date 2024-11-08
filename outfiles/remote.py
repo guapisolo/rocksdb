@@ -75,11 +75,13 @@ onum = 10000000
 # for i in [64]:
 # 	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
 
-for i in [32]:
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
-	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+runJob(threads=4, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=64, level=256, cr=32, wb=32, buf=64, cif="true", extra_op="")
+
+# for i in [32]:
+# 	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+# 	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=64, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+# 	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=256, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
+# 	runJob(threads=16, p=1.0, onum=onum, bg_threads=3, block_size=4, file_number=1, multiplier=4, file=64, level=256, cr=i, wb=i, buf=64, cif="true", extra_op="")
 
 # onum = 2000000000
 # for i in [64, 4]:

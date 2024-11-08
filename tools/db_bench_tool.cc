@@ -2291,7 +2291,19 @@ class Stats {
         fprintf(stdout, "... finished %" PRIu64 " ops%30s\r", done_, "");
       } else {
         uint64_t now = clock_->NowMicros();
-        int64_t usecs_since_last = now - last_report_finish_;
+
+        // Note(Jiajun):
+        // There may be multiple workloads of the same thread running to
+        // FinishedOps, which is async.
+        // So the now and last_report_finish_ may not be in order among
+        // different workloads. But adding mutex will cause performance
+        // overhead. We can do ostrich strategy, since there is always more than
+        // 1 workload output the right log.
+        int64_t usecs_since_last = static_cast<int64_t>(now)
+                                   - static_cast<int64_t>(last_report_finish_);
+        if (usecs_since_last < 0) {
+          return;
+        }
 
         // Determine whether to print status where interval is either
         // each N operations or each N seconds.
@@ -2310,18 +2322,18 @@ class Stats {
                   done_ - last_report_done_, done_,
                   (done_ - last_report_done_) / (usecs_since_last / 1000000.0),
                   done_ / ((now - start_) / 1000000.0),
-                  (now - last_report_finish_) / 1000000.0,
+                  (usecs_since_last) / 1000000.0,
                   (now - start_) / 1000000.0);
 
           port::TimeVal now_timeval;
           port::GetTimeOfDay(&now_timeval, nullptr);
           
           fprintf(stderr,
-                  "%s.%06d\t%" PRIu64 "\t%" PRIu64"\twrite\t%.6f\t%.1f\t\n",
-                  clock_->TimeToString(now / 1000000).c_str(),
-                  static_cast<int>(now_timeval.tv_usec),
+                  "%s.%06d\t%d\t%" PRIu64 "\t%" PRIu64"\twrite\t%.6f\t%.1f\t\n",
+                  clock_->TimeToString(now / 1000000).c_str(), 
+                  static_cast<int>(now_timeval.tv_usec), id_,
                   last_report_finish_, now,
-                  (now - last_report_finish_) / 1000000.0,
+                  (usecs_since_last) / 1000000.0,
                   (done_ - last_report_done_) / (usecs_since_last / 1000000.0));
 
           if (id_ == 0 && FLAGS_stats_per_interval) {
@@ -3912,6 +3924,7 @@ class Benchmark {
 
     ThreadArg* arg = new ThreadArg[n];
 
+    // Note(Jiajun): enumerate all threads
     for (int i = 0; i < n; i++) {
 #ifdef NUMA
       if (FLAGS_enable_numa) {
@@ -8506,7 +8519,7 @@ class Benchmark {
     std::cout << "Benchmark: " << benchmark["benchmark"] << std::endl;
     std::cout << "----------------------------------" << std::endl;
     std::cout << "Throughput: " << benchmark["throughput"] << std::endl;
-    std::cout << "Start Time: " << benchmark["start_time"] << std::endl;
+    // std::cout << "Start Time: " << benchmark["start_time"] << std::endl;
     std::cout << "Duration: " << benchmark["duration"] << std::endl;
     std::cout << "----------------------------------" << std::endl;
 
@@ -8517,8 +8530,18 @@ class Benchmark {
     FLAGS_benchmark_write_rate_limit = throughput * size_write;
     FLAGS_duration = benchmark["duration"].get<int>();
 
-    thread->shared->write_rate_limiter.reset(
-          NewGenericRateLimiter(FLAGS_benchmark_write_rate_limit));
+    // Threads share the same rate limiter, we need a mutex when update it.
+    {
+      MutexLock l(&thread->shared->mu);
+      RateLimiter* rate_limiter = thread->shared->write_rate_limiter.get();
+      if (rate_limiter == nullptr) {
+        thread->shared->write_rate_limiter.reset(
+              NewGenericRateLimiter(FLAGS_benchmark_write_rate_limit));
+      } else if (rate_limiter->GetBytesPerSecond() != 
+                static_cast<int64_t>(FLAGS_benchmark_write_rate_limit)) {
+        rate_limiter->SetBytesPerSecond(FLAGS_benchmark_write_rate_limit);
+      }
+    }
 
     // Run the benchmark in the current thread
     if (name == "fillseq") {
@@ -8546,23 +8569,54 @@ class Benchmark {
     }
 
     json data = json::parse(json_file);
-    auto test_start_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    auto test_start_time = std::chrono::duration_cast<std::chrono::seconds>(
+                     std::chrono::system_clock::now().time_since_epoch()).count();
     std::vector<std::thread> threads;
+    
+    // add loop benchmark, need loopCound, benchmarks, throughput, duration as input
+    if (data.contains("loopCount") && data["loopCount"].get<uint64_t>() > 0) {
+      int64_t loopCount = data["loopCount"].get<int>();
+      for (int64_t i = 0; i < loopCount; i++) {
+        int64_t total_duration = 0;
+        for (auto& benchmark : data["benchmarks"]) {
+          total_duration += benchmark["duration"].get<int>();
+        }
+        uint64_t prev_duration = 0;
+        for (auto& benchmark : data["benchmarks"]) {
+          auto current_time = 
+            std::chrono::duration_cast<std::chrono::seconds>(
+              std::chrono::system_clock::now().time_since_epoch()).count() 
+              - test_start_time;
+          auto start_time = i * total_duration + prev_duration;
+          int64_t delay = start_time - current_time;
+          prev_duration += benchmark["duration"].get<int>();
 
-    for (auto& benchmark : data["benchmarks"]) {
-      
-      auto current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() - test_start_time;
-      auto start_time = benchmark["start_time"].get<int>();
-      auto delay = start_time - current_time;
+          if (delay > 0) {
+              // Sleep to wait until the start time
+              std::this_thread::sleep_for(std::chrono::seconds(delay));
+          }
 
-      if (delay > 0) {
-          // Sleep to wait until the start time
-          std::this_thread::sleep_for(std::chrono::seconds(delay));
+          // Create a thread to process the task
+          threads.emplace_back(&Benchmark::JsonThreadedBenchmark, this, thread_bm, std::ref(benchmark));
+          // threads.emplace_back(&Benchmark::JsonThreadedBenchmark, thread, std::ref(benchmark));
+        }
       }
+    } else {
+      for (auto& benchmark : data["benchmarks"]) {
+        
+        auto current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() - test_start_time;
+        auto start_time = benchmark["start_time"].get<int>();
+        auto delay = start_time - current_time;
 
-      // Create a thread to process the task
-      threads.emplace_back(&Benchmark::JsonThreadedBenchmark, this, thread_bm, std::ref(benchmark));
-      // threads.emplace_back(&Benchmark::JsonThreadedBenchmark, thread, std::ref(benchmark));
+        if (delay > 0) {
+            // Sleep to wait until the start time
+            std::this_thread::sleep_for(std::chrono::seconds(delay));
+        }
+
+        // Create a thread to process the task
+        threads.emplace_back(&Benchmark::JsonThreadedBenchmark, this, thread_bm, std::ref(benchmark));
+        // threads.emplace_back(&Benchmark::JsonThreadedBenchmark, thread, std::ref(benchmark));
+      }
     }
     
     // Wait for all threads to finish

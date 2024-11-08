@@ -52,8 +52,8 @@ def decode_tsv(file_name, threads):
 	# test_start_time = int(lines[0].split("\t")[2])
 	for line in lines:
 		parts = line.split("\t")
-		if parts[3] == 'write':
-			test_start_time = int(line.split("\t")[1])
+		if parts[4] == 'write':
+			test_start_time = int(line.split("\t")[2])
 			break
 
 	tsv_timestamp = [0 for i in range(threads)]
@@ -64,26 +64,21 @@ def decode_tsv(file_name, threads):
 
 		if len(parts) == 1:
 			break
-		elif parts[3] == 'write':
-			start_time = int(parts[1]) - test_start_time
-			end_time = int(parts[2]) - test_start_time
-			ops_per_sec = float(parts[5])
-
-			flag = False
-			for i in range(threads):
-				if tsv_timestamp[i] == 0 or tsv_timestamp[i] == start_time:
-					tsv_sumop[i] += ops_per_sec * (end_time - tsv_timestamp[i]) / 1000000
-					tsv_timestamp[i] = end_time
-					tsv_result[i].append((tsv_timestamp[i] / 1000000, tsv_sumop[i]))
-					flag = True
-					break
-			assert flag, "Error: fail in decode_tsv()!"
-		
 		elif parts[1] == 'Dump':
 			dump_timestamp = int(parts[2]) - test_start_time
 			dump_timestamps.append(dump_timestamp / 1000000)
+		elif parts[4] == 'write':
+			start_time = int(parts[2]) - test_start_time
+			end_time = int(parts[3]) - test_start_time
+			ops_per_sec = float(parts[6])
+
+			i = int(parts[1])
+			tsv_sumop[i] += ops_per_sec * (end_time - tsv_timestamp[i]) / 1000000
+			tsv_timestamp[i] = end_time
+			tsv_result[i].append((tsv_timestamp[i] / 1000000, tsv_sumop[i]))
+			# break
+			# assert flag, "Error: fail in decode_tsv()!"
 	
-	print(tsv_sumop)
 	default_interval = 1
 	ops_timestamps, ops_sum = itp.work(tsv_result, default_interval)
 	ops_per_sec = np.diff(ops_sum, prepend=0) / default_interval
