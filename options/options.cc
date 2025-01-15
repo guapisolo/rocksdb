@@ -517,6 +517,8 @@ Options::PrepareForBulkLoad()
 
   // The compaction would create large files in L1.
   target_file_size_base = 256 * 1024 * 1024;
+
+  global_variable = 0;
   return this;
 }
 

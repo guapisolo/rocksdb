@@ -1041,6 +1041,9 @@ DEFINE_uint64(blob_db_bytes_per_sync,
               ROCKSDB_NAMESPACE::blob_db::BlobDBOptions().bytes_per_sync,
               "[Stacked BlobDB] Bytes to sync blob file at.");
 
+DEFINE_int32(global_variable, ROCKSDB_NAMESPACE::Options().global_variable,
+              "Set global varible for the system.");
+
 DEFINE_uint64(blob_db_file_size,
               ROCKSDB_NAMESPACE::blob_db::BlobDBOptions().blob_file_size,
               "[Stacked BlobDB] Target size of each blob file.");
@@ -4574,6 +4577,11 @@ class Benchmark {
     options.use_adaptive_mutex = FLAGS_use_adaptive_mutex;
     options.bytes_per_sync = FLAGS_bytes_per_sync;
     options.wal_bytes_per_sync = FLAGS_wal_bytes_per_sync;
+	  options.global_variable = FLAGS_global_variable;
+    if (options.global_variable == 1) {
+      options.db_paths = {DbPath("/nvme/jiajun/disk/multi", 1073741824), 
+                          DbPath("/data/jiajun/disk/multi", 107374182400)};
+    }
 
     // merge operator options
     if (!FLAGS_merge_operator.empty()) {

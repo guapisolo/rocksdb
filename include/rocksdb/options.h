@@ -807,6 +807,9 @@ struct DBOptions {
   // The default value is 1GB so that the manifest file can grow, but not
   // reach the limit of storage capacity.
   uint64_t max_manifest_file_size = 1024 * 1024 * 1024;
+  
+  // help set different mode
+  int global_variable = 0;
 
   // Number of shards used for table cache.
   int table_cache_numshardbits = 6;
